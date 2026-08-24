@@ -54,6 +54,8 @@ class Verdict:
     verification_cost_inr: float = 0.0
     llm_cost_inr: float = 0.0
     reason: str = ""
+    cost_detail: dict = field(default_factory=dict)
+    triggered: list = field(default_factory=list)
 
     def worst(self, category: Category) -> float:
         vals = [s.score for s in self.signals if s.category == category]
@@ -69,6 +71,8 @@ class Verdict:
             "verification_cost_inr": round(self.verification_cost_inr, 4),
             "llm_cost_inr": round(self.llm_cost_inr, 4),
             "reason": self.reason,
+            "cost_detail": self.cost_detail,
+            "triggered": self.triggered,
             "signals": [
                 {
                     "category": s.category.value,

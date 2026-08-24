@@ -1,4 +1,5 @@
 use_case: internal_copilot
+version: v2
 description: Internal knowledge assistant for employees.
 
 latency_budget_ms: 1000
@@ -11,12 +12,19 @@ tiers:
     checks: [pii, cost_meter]
   tier1:
     enabled: true
-    checks: [grounding, safety]
+    checks: [grounding, safety, bias]
     uncertainty_band: [0.15, 0.85]
   tier2:
     enabled: true
+    model: claude-haiku-4-5
+    effort: low
+    samples: 1
     max_escalation_rate: 0.02
     timeout_ms: 1500
+
+thresholds:
+  safety: 0.85
+  bias: 0.8
 
 costs:
   cost_of_being_wrong: 60         # INR, assumed: employee rework time
@@ -27,9 +35,15 @@ actions:
   ungrounded_claim: annotate
   low_grounding_overall: annotate
   safety_violation: block
+  bias_detected: annotate
+  schema_violation: regenerate
   uncertain: pass
   default: pass
 
 audit:
   retention_days: 90
   log_full_response: false
+
+jurisdiction:
+  primary: IN-DPDP
+  export_format: evidence_pack

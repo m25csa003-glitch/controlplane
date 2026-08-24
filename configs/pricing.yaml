@@ -1,4 +1,37 @@
-# Token prices used by the cost meter. Update before recording the demo.
-# Values are per 1M tokens, in USD. Source and date must be noted when filled in.
-providers: {}
-usd_to_inr: 0
+# Token prices and compute rates used by the cost meter.
+#
+# Anthropic prices: https://www.anthropic.com/pricing — captured 2026-08-25.
+# USD per 1M tokens. Verified figures only; see `unverified` below for the rest.
+
+usd_to_inr: 88.0        # ASSUMPTION, not a live rate. Restate on the day of the demo.
+
+providers:
+  anthropic:
+    claude-opus-5:
+      input: 5.00
+      output: 25.00
+      context: 1000000
+    claude-sonnet-5:
+      input: 3.00
+      output: 15.00
+      context: 1000000
+      note: "intro pricing 2.00/10.00 through 2026-08-31"
+    claude-haiku-4-5:
+      input: 1.00
+      output: 5.00
+      context: 200000
+
+# Prices we have not verified from a primary source. The meter refuses to use
+# these silently — it marks any cost derived from them as unverified so a number
+# in the demo can never look more solid than it is.
+unverified:
+  openai: {}
+
+# Tier 1 runs local classifiers, so its cost is compute time, not tokens.
+# Priced off an assumed on-demand instance rate.
+compute:
+  tier1_inference:
+    instance: "1x NVIDIA T4 equivalent, on-demand"
+    inr_per_hour: 45.0    # ASSUMPTION
+  tier0_rules:
+    inr_per_hour: 0.0     # regex on the request thread, not separately billable

@@ -28,7 +28,7 @@ def run(text, ctx, policy):
             if cid not in ctx.allowed_chunk_ids:
                 signals.append(Signal(Category.ACL, 1.0, 0, None, f"chunk {cid} not permitted"))
 
-    if "schema" in checks and ctx.__dict__.get("expects_json"):
+    if "schema" in checks and getattr(ctx, "expects_json", False):
         import json
         try:
             json.loads(text)

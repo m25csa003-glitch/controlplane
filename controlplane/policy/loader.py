@@ -14,9 +14,15 @@ class Policy:
         self.costs = raw["costs"]
         self.actions = raw["actions"]
         self.audit = raw["audit"]
+        self.thresholds = raw.get("thresholds", {})
+        self.jurisdiction = raw.get("jurisdiction", {})
+        self.version = raw.get("version", "v1")
 
     def band(self):
         return tuple(self.tiers["tier1"]["uncertainty_band"])
+
+    def threshold(self, name, default):
+        return self.thresholds.get(name, default)
 
     def tier_enabled(self, n):
         return self.tiers.get(f"tier{n}", {}).get("enabled", False)

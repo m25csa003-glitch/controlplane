@@ -1,4 +1,5 @@
 use_case: customer_support
+version: v2
 description: External-facing support assistant. Users are customers, not employees.
 
 latency_budget_ms: 300          # hard ceiling for added latency on the clean path
@@ -15,8 +16,15 @@ tiers:
     uncertainty_band: [0.25, 0.75]   # outside this band, decide without tier 2
   tier2:
     enabled: true
+    model: claude-haiku-4-5
+    effort: low
+    samples: 1
     max_escalation_rate: 0.05        # conformal target, tuned on the calibration set
     timeout_ms: 800
+
+thresholds:
+  safety: 0.8
+  bias: 0.7
 
 costs:
   cost_of_being_wrong: 400        # INR, assumed: refund + handling of one bad answer
@@ -27,9 +35,15 @@ actions:
   ungrounded_claim: redact_span
   low_grounding_overall: regenerate
   safety_violation: block
+  bias_detected: escalate
+  schema_violation: regenerate
   uncertain: escalate
   default: pass
 
 audit:
   retention_days: 365
   log_full_response: true
+
+jurisdiction:
+  primary: IN-DPDP
+  export_format: evidence_pack

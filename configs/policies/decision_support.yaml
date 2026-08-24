@@ -1,4 +1,5 @@
 use_case: decision_support
+version: v2
 description: Embedded in a regulated workflow. Output feeds a decision with legal weight.
 
 latency_budget_ms: 3000          # correctness beats speed here
@@ -15,8 +16,15 @@ tiers:
     uncertainty_band: [0.40, 0.90]   # wide band, escalate readily
   tier2:
     enabled: true
+    model: claude-opus-5
+    effort: high
+    samples: 3
     max_escalation_rate: 0.20
     timeout_ms: 3000
+
+thresholds:
+  safety: 0.7
+  bias: 0.55
 
 costs:
   cost_of_being_wrong: 50000      # INR, assumed: regulatory exposure of one bad decision
@@ -27,6 +35,8 @@ actions:
   ungrounded_claim: escalate
   low_grounding_overall: escalate
   safety_violation: block
+  bias_detected: escalate
+  schema_violation: regenerate
   uncertain: escalate
   default: pass
 
@@ -34,3 +44,7 @@ audit:
   retention_days: 2555            # 7 years
   log_full_response: true
   hash_chain: strict
+
+jurisdiction:
+  primary: EU-AI-Act
+  export_format: evidence_pack
