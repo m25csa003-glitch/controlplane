@@ -157,6 +157,21 @@ def write_report(results, sweep_rows, cases, meta):
                  f"{pct(base['catch_rate'])}. Tier 2 ran on "
                  f"{pct(casc['tier2_rate'])} of responses.\n")
 
+    solo = results.get("tier1_no_judge", {}).get("summary")
+    if base and casc and solo:
+        same = (round(casc["catch_rate"], 4) == round(solo["catch_rate"], 4)
+                and round(casc["false_positive_rate"], 4) == round(solo["false_positive_rate"], 4))
+        if same:
+            L.append(f"\n**Tier 2 changed no decisions on this set.** It ran on "
+                     f"{pct(casc['tier2_rate'])} of responses and cost "
+                     f"Rs {casc['verification_cost_total_inr'] - solo['verification_cost_total_inr']:.2f} "
+                     "to reach the same verdicts tier 1 already had. Two things "
+                     "follow: the uncertainty band is currently too narrow to "
+                     "catch the cases that would benefit, and the offline judge "
+                     "is not strong enough to overturn tier 1 anyway. The band "
+                     "is a policy value, so this is a tuning result, not a code "
+                     "change — but it is not yet earning its cost.\n")
+
     L.append("\n## Where the errors are\n")
     for name, r in results.items():
         s = r["summary"]
@@ -190,9 +205,13 @@ def write_report(results, sweep_rows, cases, meta):
         L.append(f"- `{name}`: chain intact = **{r['chain_ok']}** ({r['n']} records)")
 
     L.append("\n## Reading this honestly\n")
-    L.append(f"- Tier 1 grounding ran in **{meta['tier1_mode']}** mode. "
-             "In stub mode grounding is lexical overlap, not a trained model; "
-             "treat grounding recall as a floor, not a result.\n")
+    if meta["tier1_mode"] == "lexical":
+        L.append("- Tier 1 grounding ran on the **lexical fallback**, not a "
+                 "trained model: word overlap plus a numeric contradiction "
+                 "check. Treat grounding recall as a floor, not a result.\n")
+    else:
+        L.append(f"- Tier 1 grounding ran on **{meta['tier1_model']}** "
+                 f"(`{meta['tier1_mode']}`) on {meta['device']}.\n")
     if meta["judge_mode"] == "offline":
         L.append("- Tier 2 ran its **offline** judge, not a model. The offline judge "
                  "reasons about numeric and polarity contradiction only.\n")
@@ -208,6 +227,17 @@ def write_report(results, sweep_rows, cases, meta):
         L.append("- No safety model is loaded, so safety recall is 0 by "
                  "construction. The safety cases are in the set to keep that "
                  "gap visible rather than hidden.\n")
+    L.append("- `multi_hop` cases fail by construction. Each claim is scored "
+             "against each chunk separately, which is what keeps faithful "
+             "paraphrase from being flagged, but a claim that is true only by "
+             "combining two chunks matches neither one alone. A judge that sees "
+             "all sources at once is the right place to fix this, which is an "
+             "argument for widening the band on retrieval-heavy use cases.\n")
+    L.append("- The set is synthetic and was written by the same person who "
+             "tuned the checker. An earlier version of it scored 100% on every "
+             "case type, which is why the adversarial cases exist. Treat these "
+             "numbers as a lower bound on difficulty, not an upper bound on "
+             "quality.\n")
     L.append("- Base rate here is "
              f"{pct(sum(c['should_flag'] for c in cases) / len(cases))} harmful, "
              "far above production. Catch rate and false positive rate are "
@@ -217,6 +247,13 @@ def write_report(results, sweep_rows, cases, meta):
 
 
 def main():
+    if "--lexical" in sys.argv:
+        print("tier 1: lexical fallback (models not loaded)")
+    else:
+        print("loading tier 1 models ...", end=" ", flush=True)
+        tier1_classifiers.load_models()
+        print(tier1_classifiers.describe())
+
     cases = load_cases()
     results = {}
     for name, cfg in CONFIGS.items():
@@ -239,11 +276,14 @@ def main():
     print("done")
 
     import os
+    described = tier1_classifiers.describe()
     meta = {
         "generated": time.strftime("%Y-%m-%d %H:%M"),
-        "tier1_mode": tier1_classifiers.mode(),
+        "tier1_mode": described["mode"],
+        "tier1_model": described["model"],
+        "device": described["device"],
         "judge_mode": "api" if (os.getenv("ANTHROPIC_API_KEY") or os.getenv("CP_API_KEY")) else "offline",
-        "safety_model": tier1_classifiers._state.get("safety"),
+        "safety_model": described["safety"],
     }
 
     RESULTS.mkdir(parents=True, exist_ok=True)

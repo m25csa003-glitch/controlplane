@@ -5,10 +5,23 @@ import time
 from ..schema import Signal, Category
 from ..text import sentences as split_sentences
 
-GROUNDING_MODEL = os.getenv("CP_GROUNDING_MODEL", "vectara/hallucination_evaluation_model")
+# Tried in order. The first that loads wins; if none do, grounding falls back to
+# lexical overlap plus a numeric contradiction check and says so.
+#
+# NLI is first because it is what actually loads. Vectara's HHEM is the better
+# fit on paper - it is trained for exactly this - but its tokenizer cannot be
+# instantiated under transformers 5.x, with or without sentencepiece. It stays
+# in the list so the day that is fixed, it is picked up by preference; today it
+# fails in about six seconds and we fall through.
+GROUNDING_MODELS = [
+    ("nli", os.getenv("CP_NLI_MODEL", "cross-encoder/nli-deberta-v3-base"), False),
+    ("hhem", os.getenv("CP_GROUNDING_MODEL", "vectara/hallucination_evaluation_model"), True),
+]
 SAFETY_MODEL = os.getenv("CP_SAFETY_MODEL", "unitary/toxic-bert")
+BATCH = int(os.getenv("CP_TIER1_BATCH", "16"))
 
-_state = {"grounding": None, "safety": None, "device": None, "mode": "stub"}
+_state = {"score_pairs": None, "safety": None, "device": None, "mode": "lexical",
+          "model_id": None}
 
 
 def pick_device():
@@ -24,22 +37,22 @@ def pick_device():
 
 
 def load_models(device=None):
-    """Loads the real models if available. Falls back to the stub so the rest of
-    the pipeline keeps working while models are still downloading."""
+    """Loads whatever is available. Every failure is survivable: the pipeline
+    keeps working on the lexical fallback, which is what lets the demo run on a
+    machine with no models and no network."""
     device = device or pick_device()
     _state["device"] = device
 
-    try:
-        from transformers import AutoModelForSequenceClassification
-        model = AutoModelForSequenceClassification.from_pretrained(
-            GROUNDING_MODEL, trust_remote_code=True
-        )
-        model.eval()
-        _state["grounding"] = model
-        _state["mode"] = "hhem"
-    except Exception as exc:
-        print(f"[tier1] grounding model unavailable ({exc}); using stub")
-        _state["mode"] = "stub"
+    for kind, repo, remote_code in GROUNDING_MODELS:
+        fn = _load_grounding(kind, repo, remote_code, device)
+        if fn:
+            _state["score_pairs"] = fn
+            _state["mode"] = kind
+            _state["model_id"] = repo
+            break
+    else:
+        print("[tier1] no grounding model loaded; using lexical fallback")
+        _state["mode"] = "lexical"
 
     try:
         from transformers import pipeline
@@ -51,6 +64,56 @@ def load_models(device=None):
         print(f"[tier1] safety model unavailable ({exc}); safety scores will be 0")
 
     return _state["mode"]
+
+
+def _load_grounding(kind, repo, remote_code, device):
+    try:
+        import torch
+        from transformers import AutoModelForSequenceClassification, AutoTokenizer
+
+        model = AutoModelForSequenceClassification.from_pretrained(
+            repo, trust_remote_code=remote_code)
+        model.eval()
+
+        if kind == "hhem" and hasattr(model, "predict"):
+            def score_pairs(pairs):
+                # HHEM returns consistency: 1 means the claim follows from the
+                # premise. We report the opposite.
+                out = model.predict(pairs)
+                return [round(1.0 - float(c), 4) for c in out]
+            return score_pairs
+
+        entail = _entail_index(model.config)
+        if entail is None:
+            print(f"[tier1] {repo} has no entailment label; skipping")
+            return None
+
+        tok = AutoTokenizer.from_pretrained(repo, trust_remote_code=remote_code)
+        model.to(device if device != "mps" else "mps")
+
+        def score_pairs(pairs):
+            scores = []
+            for i in range(0, len(pairs), BATCH):
+                chunk = pairs[i:i + BATCH]
+                enc = tok([p for p, _ in chunk], [h for _, h in chunk],
+                          return_tensors="pt", padding=True, truncation=True,
+                          max_length=512).to(model.device)
+                with torch.no_grad():
+                    probs = torch.softmax(model(**enc).logits, dim=-1)
+                scores += [round(1.0 - float(p[entail]), 4) for p in probs]
+            return scores
+
+        return score_pairs
+    except Exception as exc:
+        print(f"[tier1] {repo} unavailable ({exc})")
+        return None
+
+
+def _entail_index(config):
+    for i, name in (getattr(config, "id2label", None) or {}).items():
+        if "entail" in str(name).lower():
+            return int(i)
+    return None
 
 
 def run(text, ctx, policy, meter=None, breakdown=None):
@@ -85,25 +148,31 @@ def _grounding_scores(sents, ctx):
     """Ungroundedness per sentence: 0 = supported by sources, 1 = unsupported."""
     if not sents:
         return []
-    premise = " ".join(c.get("text", "") for c in ctx.retrieved_chunks)
-    if not premise:
+    chunks = [c.get("text", "") for c in ctx.retrieved_chunks if c.get("text")]
+    if not chunks:
         return [0.5] * len(sents)
+    premise = " ".join(chunks)
 
     # An abstention asserts nothing, so there is nothing to ground. Scoring it
     # against the sources is how a checker ends up punishing the model for the
     # one behaviour we want when the answer is not in the documents.
     scored = [None if ABSTAIN.search(s.text) else s for s in sents]
+    live = [s for s in scored if s is not None]
 
-    model = _state.get("grounding")
-    if model is None:
+    fn = _state.get("score_pairs")
+    if fn is None or not live:
         return [0.0 if s is None else _stub_grounding(s.text, premise) for s in scored]
 
     try:
-        live = [s for s in scored if s is not None]
-        pairs = [(premise, s.text) for s in live]
-        consistency = list(model.predict(pairs)) if pairs else []
-        it = iter(consistency)
-        return [0.0 if s is None else round(1.0 - float(next(it)), 4) for s in scored]
+        # Each claim is scored against each chunk separately and keeps its best
+        # match. A claim is grounded if any one source supports it - scoring it
+        # against every source glued together instead makes an entailment model
+        # read one long unrelated passage and call a good answer unsupported.
+        values = fn([(c, s.text) for s in live for c in chunks])
+        n = len(chunks)
+        best = [min(values[i * n:(i + 1) * n]) for i in range(len(live))]
+        it = iter(best)
+        return [0.0 if s is None else next(it) for s in scored]
     except Exception as exc:
         print(f"[tier1] grounding inference failed ({exc}); falling back")
         return [0.0 if s is None else _stub_grounding(s.text, premise) for s in scored]
@@ -206,3 +275,8 @@ def _bias_score(sent):
 
 def mode():
     return _state["mode"]
+
+
+def describe():
+    return {"mode": _state["mode"], "model": _state["model_id"],
+            "device": _state["device"], "safety": bool(_state["safety"])}

@@ -6,6 +6,7 @@ from anyone's reading of it, which is the only reason the metrics mean anything.
     python3 eval/build_dataset.py
 """
 import json
+import re
 import random
 import sys
 from pathlib import Path
@@ -14,6 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from eval.corpus import (USE_CASES, PII_SAMPLES, BIAS_BENIGN, BIAS_DECISION,
                          SAFETY, REFUSALS)
+from eval.corpus_hard import HARD, MULTI_HOP, NUMERALS, UNITS
 
 OUT = Path(__file__).resolve().parent / "datasets" / "controlplane_eval_v1.jsonl"
 SEED = 20260825
@@ -129,6 +131,30 @@ def build():
         # --- safety ----------------------------------------------------
         for s in SAFETY:
             add(s, ["safety"], True, "safety", "abusive language toward a person")
+
+        # --- adversarial -----------------------------------------------
+        for f in facts:
+            for kind, (text, flag) in HARD.get(f["id"], {}).items():
+                add(text, ["grounding"] if flag else [], flag, kind,
+                    f"derived from {f['id']}")
+
+        for text, source_ids in MULTI_HOP.get(use_case, []):
+            add(text, [], False, "multi_hop",
+                f"true only by combining {' and '.join(source_ids)}")
+
+        for f in facts:
+            spelled = f["text"]
+            for digit, word in NUMERALS.items():
+                spelled = re.sub(rf"\b{digit}\b", word, spelled)
+            if spelled != f["text"]:
+                add(spelled, [], False, "numeral_synonym",
+                    "same figures written as words")
+
+            for unit, wrong in UNITS:
+                if unit in f["text"]:
+                    add(f["text"].replace(unit, wrong), ["grounding"], True,
+                        "unit_swap", f"'{unit}' changed to '{wrong}'")
+                    break
 
     rng.shuffle(rows)
     OUT.parent.mkdir(parents=True, exist_ok=True)

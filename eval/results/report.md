@@ -1,10 +1,10 @@
 # ControlPlane evaluation
 
-Generated 2026-08-25 00:58  
+Generated 2026-08-25 01:36  
 
-Dataset: `controlplane_eval_v1.jsonl`, 228 cases  
+Dataset: `controlplane_eval_v1.jsonl`, 319 cases  
 
-Tier 1 grounding mode: **stub**  
+Tier 1 grounding mode: **nli**  
 
 Tier 2 judge: **offline**
 
@@ -16,12 +16,15 @@ Tier 2 judge: **offline**
 
 | config | catch rate | false positive rate | precision | F1 | tier 2 rate | p95 latency | verify cost (total) | verify as % of LLM spend |
 |---|---|---|---|---|---|---|---|---|
-| `tier0_only` | 32.6% | 0.0% | 100.0% | 49.1% | 0.0% | 0.01 ms | Rs 0.0000 | 0.000% |
-| `tier1_no_judge` | 89.9% | 19.2% | 85.9% | 87.9% | 0.0% | 0.04 ms | Rs 0.0000 | 0.000% |
-| `cascade` | 89.1% | 15.2% | 88.5% | 88.8% | 23.7% | 0.05 ms | Rs 100.3108 | 128.688% |
-| `judge_everything` | 86.0% | 41.4% | 73.0% | 79.0% | 100.0% | 0.07 ms | Rs 596.7779 | 765.604% |
+| `tier0_only` | 22.8% | 0.0% | 100.0% | 37.2% | 0.0% | 0.02 ms | Rs 0.0000 | 0.000% |
+| `tier1_no_judge` | 94.0% | 10.4% | 92.5% | 93.3% | 0.0% | 85.29 ms | Rs 0.2205 | 0.202% |
+| `cascade` | 94.0% | 10.4% | 92.5% | 93.3% | 2.5% | 84.85 ms | Rs 21.2482 | 19.483% |
+| `judge_everything` | 73.4% | 42.2% | 70.3% | 71.8% | 100.0% | 90.92 ms | Rs 815.7043 | 747.943% |
 
-**Cascade costs 16.8% of judging everything**, at 89.1% catch rate against 86.0%. Tier 2 ran on 23.7% of responses.
+**Cascade costs 2.6% of judging everything**, at 94.0% catch rate against 73.4%. Tier 2 ran on 2.5% of responses.
+
+
+**Tier 2 changed no decisions on this set.** It ran on 2.5% of responses and cost Rs 21.03 to reach the same verdicts tier 1 already had. Two things follow: the uncertainty band is currently too narrow to catch the cases that would benefit, and the offline judge is not strong enough to overturn tier 1 anyway. The band is a policy value, so this is a tuning result, not a code change — but it is not yet earning its cost.
 
 
 ## Where the errors are
@@ -29,12 +32,12 @@ Tier 2 judge: **offline**
 
 ### `tier0_only`
 
-true pos 42 · false pos 0 · false neg 87 · true neg 99
+true pos 42 · false pos 0 · false neg 142 · true neg 135
 
 
 | category | labelled | recall | co-fires on unlabelled |
 |---|---|---|---|
-| grounding | 72 | 0.0% | 0 (0.0%) |
+| grounding | 127 | 0.0% | 0 (0.0%) |
 | pii | 30 | 100.0% | 0 (0.0%) |
 | acl | 12 | 100.0% | 0 (0.0%) |
 | bias | 18 | 0.0% | 0 (0.0%) |
@@ -42,42 +45,42 @@ true pos 42 · false pos 0 · false neg 87 · true neg 99
 
 ### `tier1_no_judge`
 
-true pos 116 · false pos 19 · false neg 13 · true neg 80
+true pos 173 · false pos 14 · false neg 11 · true neg 121
 
 
 | category | labelled | recall | co-fires on unlabelled |
 |---|---|---|---|
-| grounding | 72 | 93.1% | 78 (50.0%) |
+| grounding | 127 | 93.7% | 59 (30.7%) |
 | pii | 30 | 100.0% | 0 (0.0%) |
 | acl | 12 | 100.0% | 0 (0.0%) |
 | bias | 18 | 88.9% | 0 (0.0%) |
-| safety | 9 | 0.0% | 0 (0.0%) |
+| safety | 9 | 100.0% | 0 (0.0%) |
 
 ### `cascade`
 
-true pos 115 · false pos 15 · false neg 14 · true neg 84
+true pos 173 · false pos 14 · false neg 11 · true neg 121
 
 
 | category | labelled | recall | co-fires on unlabelled |
 |---|---|---|---|
-| grounding | 72 | 90.3% | 74 (47.4%) |
+| grounding | 127 | 92.1% | 59 (30.7%) |
 | pii | 30 | 100.0% | 0 (0.0%) |
 | acl | 12 | 100.0% | 0 (0.0%) |
 | bias | 18 | 88.9% | 0 (0.0%) |
-| safety | 9 | 0.0% | 0 (0.0%) |
+| safety | 9 | 100.0% | 0 (0.0%) |
 
 ### `judge_everything`
 
-true pos 111 · false pos 41 · false neg 18 · true neg 58
+true pos 135 · false pos 57 · false neg 49 · true neg 78
 
 
 | category | labelled | recall | co-fires on unlabelled |
 |---|---|---|---|
-| grounding | 72 | 93.1% | 109 (69.9%) |
+| grounding | 127 | 75.6% | 133 (69.3%) |
 | pii | 30 | 100.0% | 0 (0.0%) |
 | acl | 12 | 100.0% | 0 (0.0%) |
 | bias | 18 | 88.9% | 0 (0.0%) |
-| safety | 9 | 0.0% | 0 (0.0%) |
+| safety | 9 | 100.0% | 0 (0.0%) |
 
 ## By case type — cascade
 
@@ -85,18 +88,25 @@ true pos 111 · false pos 41 · false neg 18 · true neg 58
 |---|---|---|---|---|
 | acl_breach | 12 | flag | 12 | 100.0% |
 | bias_benign | 15 | pass | 15 | 100.0% |
-| bias_decision | 18 | flag | 17 | 94.4% |
-| entity_fabrication | 15 | flag | 14 | 93.3% |
-| fabricated_clause | 15 | flag | 11 | 73.3% |
+| bias_decision | 18 | flag | 18 | 100.0% |
+| conditional_flip | 15 | flag | 13 | 86.7% |
+| entity_fabrication | 15 | flag | 15 | 100.0% |
+| fabricated_clause | 15 | flag | 15 | 100.0% |
 | grounded_exact | 15 | pass | 15 | 100.0% |
-| grounded_paraphrase | 45 | pass | 30 | 66.7% |
+| grounded_paraphrase | 45 | pass | 45 | 100.0% |
+| hedged_correct | 15 | pass | 10 | 66.7% |
 | multi_fact_grounded | 9 | pass | 9 | 100.0% |
-| number_swap | 15 | flag | 12 | 80.0% |
+| multi_hop | 9 | pass | 0 | 0.0% |
+| number_swap | 15 | flag | 15 | 100.0% |
+| numeral_synonym | 12 | pass | 12 | 100.0% |
+| partial_truth | 15 | flag | 15 | 100.0% |
 | pii_leak | 18 | flag | 18 | 100.0% |
 | pii_plus_hallucination | 12 | flag | 12 | 100.0% |
+| quantifier_flip | 15 | flag | 8 | 53.3% |
 | refusal | 15 | pass | 15 | 100.0% |
 | safety | 9 | flag | 9 | 100.0% |
-| unsupported_extrapolation | 15 | flag | 10 | 66.7% |
+| unit_swap | 10 | flag | 8 | 80.0% |
+| unsupported_extrapolation | 15 | flag | 15 | 100.0% |
 
 ## Over-flagging against under-flagging
 
@@ -105,34 +115,38 @@ Tier 1 alone, threshold swept. The brief asks for this tradeoff to be exposed ra
 
 | threshold | catch rate | false positive rate | precision |
 |---|---|---|---|
-| 0.05 | 98.4% | 41.4% | 75.6% |
-| 0.12 | 98.4% | 41.4% | 75.6% |
-| 0.20 | 98.4% | 38.4% | 77.0% |
-| 0.28 | 96.1% | 31.3% | 80.0% |
-| 0.35 | 95.3% | 26.3% | 82.6% |
-| 0.42 | 93.0% | 19.2% | 86.3% |
-| 0.50 | 92.2% | 19.2% | 86.2% |
-| 0.57 | 88.4% | 12.1% | 90.5% |
-| 0.65 | 87.6% | 8.1% | 93.4% |
-| 0.72 | 85.3% | 3.0% | 97.3% |
-| 0.80 | 83.7% | 2.0% | 98.2% |
-| 0.88 | 82.2% | 0.0% | 100.0% |
-| 0.95 | 55.0% | 0.0% | 100.0% |
+| 0.05 | 96.7% | 16.3% | 89.0% |
+| 0.12 | 95.7% | 12.6% | 91.2% |
+| 0.20 | 95.1% | 12.6% | 91.1% |
+| 0.28 | 94.6% | 12.6% | 91.1% |
+| 0.35 | 94.6% | 12.6% | 91.1% |
+| 0.42 | 94.6% | 11.1% | 92.1% |
+| 0.50 | 94.6% | 11.1% | 92.1% |
+| 0.57 | 94.0% | 11.1% | 92.0% |
+| 0.65 | 93.5% | 10.4% | 92.5% |
+| 0.72 | 93.5% | 10.4% | 92.5% |
+| 0.80 | 93.5% | 10.4% | 92.5% |
+| 0.88 | 92.9% | 10.4% | 92.4% |
+| 0.95 | 91.8% | 10.4% | 92.3% |
 
 ## Audit chain
 
-- `tier0_only`: chain intact = **True** (228 records)
-- `tier1_no_judge`: chain intact = **True** (228 records)
-- `cascade`: chain intact = **True** (228 records)
-- `judge_everything`: chain intact = **True** (228 records)
+- `tier0_only`: chain intact = **True** (319 records)
+- `tier1_no_judge`: chain intact = **True** (319 records)
+- `cascade`: chain intact = **True** (319 records)
+- `judge_everything`: chain intact = **True** (319 records)
 
 ## Reading this honestly
 
-- Tier 1 grounding ran in **stub** mode. In stub mode grounding is lexical overlap, not a trained model; treat grounding recall as a floor, not a result.
+- Tier 1 grounding ran on **cross-encoder/nli-deberta-v3-base** (`nli`) on mps.
 
 - Tier 2 ran its **offline** judge, not a model. The offline judge reasons about numeric and polarity contradiction only.
 
-- No safety model is loaded, so safety recall is 0 by construction. The safety cases are in the set to keep that gap visible rather than hidden.
+- `judge_everything` is therefore not an upper bound on quality. Its catch rate is capped by the same offline judge, and it inherits that judge's habit of scoring paraphrase as unsupported - which is why its false positive rate is worse than the cascade's here. With a real judge behind a key, expect it to beat the cascade on catch rate and still cost roughly six times as much. The cost ratio is the durable finding; the quality ordering is not.
 
-- Base rate here is 56.6% harmful, far above production. Catch rate and false positive rate are unaffected by that; precision is not, and would fall in production.
+- `multi_hop` cases fail by construction. Each claim is scored against each chunk separately, which is what keeps faithful paraphrase from being flagged, but a claim that is true only by combining two chunks matches neither one alone. A judge that sees all sources at once is the right place to fix this, which is an argument for widening the band on retrieval-heavy use cases.
+
+- The set is synthetic and was written by the same person who tuned the checker. An earlier version of it scored 100% on every case type, which is why the adversarial cases exist. Treat these numbers as a lower bound on difficulty, not an upper bound on quality.
+
+- Base rate here is 57.7% harmful, far above production. Catch rate and false positive rate are unaffected by that; precision is not, and would fall in production.
 

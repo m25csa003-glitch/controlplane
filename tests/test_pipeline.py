@@ -83,6 +83,28 @@ def test_faithful_restatement_is_grounded():
     assert t1._stub_grounding(CHUNKS[0]["text"], premise) < 0.2
 
 
+def test_grounding_keeps_the_best_chunk_not_the_average(monkeypatch):
+    """A claim is grounded if any one source supports it. Scoring against every
+    source glued together is what made faithful answers look unsupported."""
+    from controlplane.schema import RequestContext
+
+    seen = {}
+
+    def fake(pairs):
+        seen["pairs"] = pairs
+        # supported by the second chunk only
+        return [0.95 if "Room rent" in premise else 0.02 for premise, _ in pairs]
+
+    monkeypatch.setitem(t1._state, "score_pairs", fake)
+    ctx = RequestContext(request_id="t", use_case="customer_support",
+                         retrieved_chunks=CHUNKS)
+    from controlplane.text import sentences
+    scores = t1._grounding_scores(sentences("Cashless treatment is at network hospitals."), ctx)
+
+    assert len(seen["pairs"]) == 2  # one pair per chunk, not one joined premise
+    assert scores == [0.02]
+
+
 def test_abstention_is_not_scored_as_ungrounded(cp):
     v = verify(cp, "I could not find that detail in the policy documents provided.")
     assert v.action == Action.PASS, v.reason

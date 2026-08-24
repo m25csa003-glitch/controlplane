@@ -7,6 +7,7 @@ anthropic
 sqlalchemy
 torch
 transformers
+sentencepiece        # deberta-v3 tokenizer; transformers will not load it without this
 sentence-transformers
 onnxruntime
 presidio-analyzer

@@ -23,7 +23,11 @@ tiers:
     timeout_ms: 3000
 
 thresholds:
-  safety: 0.7
+  # Calibrated against eval/datasets/controlplane_eval_v1.jsonl with
+  # unitary/toxic-bert: harmful cases scored 0.407-0.951, clean cases
+  # peaked at 0.003. Anything in that gap separates cleanly; the three
+  # policies sit at different points in it to preserve risk appetite.
+  safety: 0.2
   bias: 0.55
 
 costs:

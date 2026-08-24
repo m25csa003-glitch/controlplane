@@ -36,10 +36,14 @@ CASES = [
 
 
 def main():
+    import os
+    if "--models" in sys.argv:
+        print("loading tier 1 models ...", flush=True)
+        tier1_classifiers.load_models()
+
     cp = ControlPlane(audit_path="demo/audit.jsonl")
-    print(f"tier 1 mode: {tier1_classifiers.mode()}   "
-          f"judge: offline (no ANTHROPIC_API_KEY set)\n"
-          if not __import__("os").getenv("ANTHROPIC_API_KEY") else "")
+    judge = "api" if os.getenv("ANTHROPIC_API_KEY") else "offline (no ANTHROPIC_API_KEY)"
+    print(f"tier 1: {tier1_classifiers.describe()}\njudge:  {judge}")
 
     for use_case in ["customer_support", "internal_copilot", "decision_support"]:
         policy = cp.policies[use_case]
