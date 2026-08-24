@@ -5,6 +5,7 @@ pydantic
 pyyaml
 anthropic
 openai
+python-dotenv
 sqlalchemy
 torch
 transformers
