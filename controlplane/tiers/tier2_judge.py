@@ -11,6 +11,20 @@ from ..schema import Signal
 DEFAULT_MODELS = {"anthropic": "claude-opus-5", "openai": "gpt-5.6-sol"}
 
 
+# A judge call that fails falls back to the offline judge, quietly and by
+# design. Over a whole eval run that would silently turn an API result into a
+# lexical one, so the fallbacks are counted and reported.
+STATS = {"api_calls": 0, "api_failures": 0, "offline": 0}
+
+
+def stats():
+    return dict(STATS)
+
+
+def reset_stats():
+    STATS.update(api_calls=0, api_failures=0, offline=0)
+
+
 def _provider():
     forced = os.getenv("CP_JUDGE_PROVIDER")
     if forced:
@@ -97,7 +111,10 @@ def _judge(claims, sources, cfg, meter, breakdown):
         judge = {"anthropic": _anthropic_judge, "openai": _openai_judge}.get(provider)
         out = judge(claims, sources, cfg, key, meter, breakdown) if judge else None
         if out is not None:
+            STATS["api_calls"] += 1
             return out
+        STATS["api_failures"] += 1
+    STATS["offline"] += 1
     _model_cost(claims, sources, cfg, meter, breakdown)
     scores, reasons = zip(*(_offline_judge(c, sources) for c in claims))
     return list(scores), list(reasons), "offline"

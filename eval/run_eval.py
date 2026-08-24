@@ -22,7 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from controlplane.pipeline import ControlPlane
 from controlplane.policy.loader import Policy
-from controlplane.tiers import tier1_classifiers
+from controlplane.tiers import tier1_classifiers, tier2_judge
 from eval.metrics import summarize, per_category, per_kind
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -70,6 +70,7 @@ def run_config(name, cfg, cases):
     if audit_path.exists():
         audit_path.unlink()
     cp = make_plane(cfg["mutate"], audit_path)
+    tier2_judge.reset_stats()
 
     rows = []
     started = time.perf_counter()
@@ -97,7 +98,7 @@ def run_config(name, cfg, cases):
         })
     wall = time.perf_counter() - started
     chain_ok, _ = cp.audit.verify()
-    return rows, wall, chain_ok
+    return rows, wall, chain_ok, tier2_judge.stats()
 
 
 def sweep(cases, points=13):
@@ -113,7 +114,7 @@ def sweep(cases, points=13):
             raw["tiers"]["tier2"]["enabled"] = False
             return raw
 
-        rows, _, _ = run_config(f"sweep_{t}", {"mutate": mutate, "audit_mode": False}, cases)
+        rows, *_ = run_config(f"sweep_{t}", {"mutate": mutate, "audit_mode": False}, cases)
         s = summarize(rows)
         out.append({"threshold": t,
                     "catch_rate": s["catch_rate"],
@@ -141,7 +142,7 @@ def band_sweep(cases):
             return raw
 
         name = f"band_{lo}_{hi}"
-        rows, _, _ = run_config(name, {"mutate": mutate, "audit_mode": False}, cases)
+        rows, *_ = run_config(name, {"mutate": mutate, "audit_mode": False}, cases)
         s = summarize(rows)
         out.append({"band": f"[{lo}, {hi}]",
                     "catch_rate": s["catch_rate"],
@@ -238,6 +239,42 @@ def write_report(results, sweep_rows, band_rows, cases, meta):
         L.append(f"| `{b['band']}` | {pct(b['tier2_rate'])} | {pct(b['catch_rate'])} | "
                  f"{pct(b['false_positive_rate'])} | Rs {b['cost_inr']:.2f} |")
 
+    L.append("\n## Latency against the policy budget\n")
+    L.append("`latency_budget_ms` is the ceiling each policy sets on added "
+             "latency for the clean path. p95 below is measured across all "
+             "responses in that use case, judge calls included.\n")
+    L.append("\n| use case | budget | p95 measured | p95 when tier 2 ran | verdict |")
+    L.append("|---|---|---|---|---|")
+    for uc, budget in meta["budgets"].items():
+        rows_uc = [r for r in results["cascade"]["rows"] if r["use_case"] == uc]
+        if not rows_uc:
+            continue
+        from eval.metrics import percentile
+        p95 = percentile([r["latency_ms"] for r in rows_uc], 95)
+        judged = [r["latency_ms"] for r in rows_uc if 2 in r["tiers_run"]]
+        p95j = percentile(judged, 95) if judged else None
+        over = (p95j or p95) > budget
+        L.append(f"| {uc} | {budget} ms | {p95:.0f} ms | "
+                 f"{f'{p95j:.0f} ms' if p95j is not None else 'n/a'} | "
+                 f"{'**over budget**' if over else 'within budget'} |")
+    L.append("\nA judge call is 1.3 s on the cheap model and 3.1 s on the "
+             "strong one. No amount of tuning fits that inside a 300 ms "
+             "customer-support budget. Tier 2 is therefore not an inline step "
+             "for a latency-bound use case - it has to run beside the response "
+             "or after it, which is what the streaming path has to solve. The "
+             "clean path, where tier 2 does not run at all, stays inside "
+             "budget; it is only the escalated few percent that blow it.\n")
+
+    L.append("\n## Judge calls\n")
+    L.append("A judge call that fails falls back to the offline judge silently. "
+             "If `failed` is not zero, the numbers above are a blend of two "
+             "different judges and should not be read as an API result.\n")
+    L.append("\n| config | api calls | failed | offline |")
+    L.append("|---|---|---|---|")
+    for name, r in results.items():
+        j = r.get("judge_stats", {})
+        L.append(f"| `{name}` | {j.get('api_calls', 0)} | {j.get('api_failures', 0)} | {j.get('offline', 0)} |")
+
     L.append("\n## Audit chain\n")
     for name, r in results.items():
         L.append(f"- `{name}`: chain intact = **{r['chain_ok']}** ({r['n']} records)")
@@ -296,7 +333,7 @@ def main():
     results = {}
     for name, cfg in CONFIGS.items():
         print(f"running {name} ...", end=" ", flush=True)
-        rows, wall, chain_ok = run_config(name, cfg, cases)
+        rows, wall, chain_ok, jstats = run_config(name, cfg, cases)
         results[name] = {
             "summary": summarize(rows),
             "per_category": per_category(rows),
@@ -304,10 +341,13 @@ def main():
             "chain_ok": chain_ok,
             "n": len(rows),
             "wall_s": wall,
+            "judge_stats": jstats,
+            "rows": rows,
         }
         s = results[name]["summary"]
         print(f"catch {pct(s['catch_rate'])}  fpr {pct(s['false_positive_rate'])}  "
-              f"cost Rs{s['verification_cost_total_inr']:.4f}  ({wall:.1f}s)")
+              f"cost Rs{s['verification_cost_total_inr']:.4f}  ({wall:.1f}s)  "
+              f"judge={jstats['api_calls']}ok/{jstats['api_failures']}fail/{jstats['offline']}offline")
 
     print("sweeping tier 1 threshold ...", end=" ", flush=True)
     sweep_rows = sweep(cases)
@@ -326,6 +366,7 @@ def main():
         "device": described["device"],
         "judge_mode": "api" if (os.getenv("ANTHROPIC_API_KEY") or os.getenv("CP_API_KEY")) else "offline",
         "safety_model": described["safety"],
+        "budgets": {n: p.latency_budget_ms for n, p in ControlPlane().policies.items()},
     }
 
     RESULTS.mkdir(parents=True, exist_ok=True)
