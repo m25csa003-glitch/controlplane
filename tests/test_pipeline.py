@@ -170,6 +170,17 @@ def test_modelled_judge_cost_is_flagged_unverified(cp):
     assert all(l["method"] == "modelled" and not l["verified"] for l in judge)
 
 
+@pytest.mark.live
+def test_live_judge_catches_a_changed_number(cp):
+    """The offline judge and the real one have to agree on the obvious case,
+    or the offline fallback is not a fallback."""
+    v = verify(cp, "Cashless treatment requires prior authorisation from the insurer.")
+    assert 2 in v.tiers_run, v.tiers_run
+    judge = [l for l in v.cost_detail["lines"] if l["label"] == "tier2_judge"]
+    assert judge and all(l["method"] == "reported" and l["verified"] for l in judge)
+    assert any(s.tier == 2 for s in v.signals)
+
+
 def test_confident_detection_skips_the_judge(cp):
     """The point of the band: a claim tier 1 is sure about does not get paid for
     twice."""

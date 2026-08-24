@@ -8,6 +8,7 @@ from fastapi import FastAPI, Request, Header
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from ..pipeline import ControlPlane
+from ..streaming import StreamingVerifier
 from ..schema import Action
 
 UPSTREAM = os.getenv("CP_UPSTREAM", "mock")
@@ -144,23 +145,47 @@ def _mock_reply(prompt):
 
 
 async def _stream_and_verify(body, use_case, extras):
-    """Day 1 behaviour: pass tokens through, verify once the stream completes.
-    Wednesday's task is to move verification alongside the stream."""
-    collected = []
-    async for chunk in _stream_upstream(body):
-        collected.append(chunk)
-        payload = {"choices": [{"delta": {"content": chunk}, "index": 0}]}
-        yield f"data: {json.dumps(payload)}\n\n"
+    """Verification runs beside the stream, not after it.
 
-    text = "".join(collected)
-    verdict = cp.verify(
-        text,
-        use_case,
+    Each sentence is checked as it completes while the model is still writing
+    the next one, so on the clean path the verdict is ready when the last token
+    is. Whether a sentence waits for its check before going out is
+    `streaming_mode` in the policy."""
+    verifier = StreamingVerifier(
+        cp, use_case,
         retrieved_chunks=extras.get("retrieved_chunks"),
         allowed_chunk_ids=set(extras["allowed_chunk_ids"]) if extras.get("allowed_chunk_ids") else None,
+        user_id=extras.get("user_id", "anon"),
     )
-    yield f"data: {json.dumps({'controlplane': verdict.to_record()})}\n\n"
+
+    async for chunk in _stream_upstream(body):
+        step = await verifier.feed(chunk)
+        if step.release:
+            yield _sse({"choices": [{"delta": {"content": step.release}, "index": 0}]})
+        for event in step.events:
+            yield _sse({"controlplane": event})
+
+    step = await verifier.close()
+    if step.release:
+        yield _sse({"choices": [{"delta": {"content": step.release}, "index": 0}]})
+    for event in step.events:
+        yield _sse({"controlplane": event})
+
+    verdict = verifier.verdict
+    cp.audit.append(verdict.to_record(), policy_version=cp.policies[use_case].version)
+
+    # In streaming mode the caller has already seen the text, so a late verdict
+    # is a correction rather than a gate. Say which it was.
+    yield _sse({"controlplane": {
+        "type": "verdict",
+        "applied": verdict.action.value if verifier.mode == "buffered" else "advisory",
+        **verdict.to_record(),
+    }})
     yield "data: [DONE]\n\n"
+
+
+def _sse(payload):
+    return f"data: {json.dumps(payload)}\n\n"
 
 
 async def _stream_upstream(body):
