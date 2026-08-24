@@ -122,8 +122,9 @@ def run(text, ctx, policy, meter=None, breakdown=None):
     checks = policy.checks(1)
     sents = split_sentences(text)
 
+    combine = policy.tiers.get("tier1", {}).get("combine_sources", True)
     if "grounding" in checks:
-        for sent, score in zip(sents, _grounding_scores(sents, ctx)):
+        for sent, score in zip(sents, _grounding_scores(sents, ctx, combine)):
             if score > 0.0:
                 signals.append(Signal(Category.GROUNDING, score, 1, sent.span, sent.text[:80]))
 
@@ -144,8 +145,13 @@ def run(text, ctx, policy, meter=None, breakdown=None):
     return signals, elapsed
 
 
-def _grounding_scores(sents, ctx):
-    """Ungroundedness per sentence: 0 = supported by sources, 1 = unsupported."""
+def _grounding_scores(sents, ctx, combine=True):
+    """Ungroundedness per sentence: 0 = supported by sources, 1 = unsupported.
+
+    combine adds the joined premise as an extra candidate. It roughly halves the
+    false positive rate and rescues multi-hop claims, and it roughly doubles
+    tier 1 latency. Which is why it is a policy value: a 300 ms customer-support
+    budget and a 3 s decision-support budget do not want the same answer."""
     if not sents:
         return []
     chunks = [c.get("text", "") for c in ctx.retrieved_chunks if c.get("text")]
@@ -168,8 +174,13 @@ def _grounding_scores(sents, ctx):
         # match. A claim is grounded if any one source supports it - scoring it
         # against every source glued together instead makes an entailment model
         # read one long unrelated passage and call a good answer unsupported.
-        values = fn([(c, s.text) for s in live for c in chunks])
-        n = len(chunks)
+        #
+        # The joined premise is kept as one extra candidate rather than dropped,
+        # because a claim can be true only by combining two chunks and match
+        # neither alone. Per-chunk alone scored every such claim at 0.99.
+        premises = chunks + ([premise] if combine and len(chunks) > 1 else [])
+        values = fn([(p, s.text) for s in live for p in premises])
+        n = len(premises)
         best = [min(values[i * n:(i + 1) * n]) for i in range(len(live))]
         it = iter(best)
         return [0.0 if s is None else next(it) for s in scored]

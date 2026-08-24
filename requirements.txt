@@ -4,6 +4,7 @@ httpx
 pydantic
 pyyaml
 anthropic
+openai
 sqlalchemy
 torch
 transformers

@@ -1,6 +1,6 @@
 # ControlPlane evaluation
 
-Generated 2026-08-25 01:36  
+Generated 2026-08-25 02:21  
 
 Dataset: `controlplane_eval_v1.jsonl`, 319 cases  
 
@@ -17,14 +17,14 @@ Tier 2 judge: **offline**
 | config | catch rate | false positive rate | precision | F1 | tier 2 rate | p95 latency | verify cost (total) | verify as % of LLM spend |
 |---|---|---|---|---|---|---|---|---|
 | `tier0_only` | 22.8% | 0.0% | 100.0% | 37.2% | 0.0% | 0.02 ms | Rs 0.0000 | 0.000% |
-| `tier1_no_judge` | 94.0% | 10.4% | 92.5% | 93.3% | 0.0% | 85.29 ms | Rs 0.2205 | 0.202% |
-| `cascade` | 94.0% | 10.4% | 92.5% | 93.3% | 2.5% | 84.85 ms | Rs 21.2482 | 19.483% |
-| `judge_everything` | 73.4% | 42.2% | 70.3% | 71.8% | 100.0% | 90.92 ms | Rs 815.7043 | 747.943% |
+| `tier1_no_judge` | 93.5% | 7.4% | 94.5% | 94.0% | 0.0% | 142.25 ms | Rs 0.3545 | 0.325% |
+| `cascade` | 93.5% | 7.4% | 94.5% | 94.0% | 2.8% | 139.35 ms | Rs 21.5218 | 19.734% |
+| `judge_everything` | 73.4% | 42.2% | 70.3% | 71.8% | 100.0% | 157.39 ms | Rs 815.8516 | 748.078% |
 
-**Cascade costs 2.6% of judging everything**, at 94.0% catch rate against 73.4%. Tier 2 ran on 2.5% of responses.
+**Cascade costs 2.6% of judging everything**, at 93.5% catch rate against 73.4%. Tier 2 ran on 2.8% of responses.
 
 
-**Tier 2 changed no decisions on this set.** It ran on 2.5% of responses and cost Rs 21.03 to reach the same verdicts tier 1 already had. Two things follow: the uncertainty band is currently too narrow to catch the cases that would benefit, and the offline judge is not strong enough to overturn tier 1 anyway. The band is a policy value, so this is a tuning result, not a code change — but it is not yet earning its cost.
+**Tier 2 changed no decisions on this set.** It ran on 2.8% of responses and cost Rs 21.17 to reach the same verdicts tier 1 already had. Two things follow: the uncertainty band is currently too narrow to catch the cases that would benefit, and the offline judge is not strong enough to overturn tier 1 anyway. The band is a policy value, so this is a tuning result, not a code change — but it is not yet earning its cost.
 
 
 ## Where the errors are
@@ -45,12 +45,12 @@ true pos 42 · false pos 0 · false neg 142 · true neg 135
 
 ### `tier1_no_judge`
 
-true pos 173 · false pos 14 · false neg 11 · true neg 121
+true pos 172 · false pos 10 · false neg 12 · true neg 125
 
 
 | category | labelled | recall | co-fires on unlabelled |
 |---|---|---|---|
-| grounding | 127 | 93.7% | 59 (30.7%) |
+| grounding | 127 | 92.1% | 57 (29.7%) |
 | pii | 30 | 100.0% | 0 (0.0%) |
 | acl | 12 | 100.0% | 0 (0.0%) |
 | bias | 18 | 88.9% | 0 (0.0%) |
@@ -58,12 +58,12 @@ true pos 173 · false pos 14 · false neg 11 · true neg 121
 
 ### `cascade`
 
-true pos 173 · false pos 14 · false neg 11 · true neg 121
+true pos 172 · false pos 10 · false neg 12 · true neg 125
 
 
 | category | labelled | recall | co-fires on unlabelled |
 |---|---|---|---|
-| grounding | 127 | 92.1% | 59 (30.7%) |
+| grounding | 127 | 90.6% | 57 (29.7%) |
 | pii | 30 | 100.0% | 0 (0.0%) |
 | acl | 12 | 100.0% | 0 (0.0%) |
 | bias | 18 | 88.9% | 0 (0.0%) |
@@ -94,15 +94,15 @@ true pos 135 · false pos 57 · false neg 49 · true neg 78
 | fabricated_clause | 15 | flag | 15 | 100.0% |
 | grounded_exact | 15 | pass | 15 | 100.0% |
 | grounded_paraphrase | 45 | pass | 45 | 100.0% |
-| hedged_correct | 15 | pass | 10 | 66.7% |
+| hedged_correct | 15 | pass | 11 | 73.3% |
 | multi_fact_grounded | 9 | pass | 9 | 100.0% |
-| multi_hop | 9 | pass | 0 | 0.0% |
+| multi_hop | 9 | pass | 3 | 33.3% |
 | number_swap | 15 | flag | 15 | 100.0% |
 | numeral_synonym | 12 | pass | 12 | 100.0% |
 | partial_truth | 15 | flag | 15 | 100.0% |
 | pii_leak | 18 | flag | 18 | 100.0% |
 | pii_plus_hallucination | 12 | flag | 12 | 100.0% |
-| quantifier_flip | 15 | flag | 8 | 53.3% |
+| quantifier_flip | 15 | flag | 7 | 46.7% |
 | refusal | 15 | pass | 15 | 100.0% |
 | safety | 9 | flag | 9 | 100.0% |
 | unit_swap | 10 | flag | 8 | 80.0% |
@@ -115,19 +115,35 @@ Tier 1 alone, threshold swept. The brief asks for this tradeoff to be exposed ra
 
 | threshold | catch rate | false positive rate | precision |
 |---|---|---|---|
-| 0.05 | 96.7% | 16.3% | 89.0% |
-| 0.12 | 95.7% | 12.6% | 91.2% |
-| 0.20 | 95.1% | 12.6% | 91.1% |
-| 0.28 | 94.6% | 12.6% | 91.1% |
-| 0.35 | 94.6% | 12.6% | 91.1% |
-| 0.42 | 94.6% | 11.1% | 92.1% |
-| 0.50 | 94.6% | 11.1% | 92.1% |
-| 0.57 | 94.0% | 11.1% | 92.0% |
-| 0.65 | 93.5% | 10.4% | 92.5% |
-| 0.72 | 93.5% | 10.4% | 92.5% |
-| 0.80 | 93.5% | 10.4% | 92.5% |
-| 0.88 | 92.9% | 10.4% | 92.4% |
-| 0.95 | 91.8% | 10.4% | 92.3% |
+| 0.05 | 95.7% | 14.8% | 89.8% |
+| 0.12 | 94.6% | 11.1% | 92.1% |
+| 0.20 | 94.6% | 10.4% | 92.6% |
+| 0.28 | 94.0% | 10.4% | 92.5% |
+| 0.35 | 94.0% | 9.6% | 93.0% |
+| 0.42 | 94.0% | 8.1% | 94.0% |
+| 0.50 | 94.0% | 8.1% | 94.0% |
+| 0.57 | 94.0% | 8.1% | 94.0% |
+| 0.65 | 93.5% | 8.1% | 94.0% |
+| 0.72 | 93.5% | 8.1% | 94.0% |
+| 0.80 | 93.5% | 7.4% | 94.5% |
+| 0.88 | 92.9% | 7.4% | 94.5% |
+| 0.95 | 90.8% | 7.4% | 94.4% |
+
+## What tier 2 buys, by band width
+
+`[0.5, 0.5]` is an empty band, so the judge never runs. `[0.0, 1.01]` sends everything tier 1 flagged at all.
+
+
+| band | tier 2 rate | catch rate | false positive rate | verify cost |
+|---|---|---|---|---|
+| `[0.5, 0.5]` | 0.0% | 94.0% | 8.1% | Rs 0.50 |
+| `[0.4, 0.6]` | 0.3% | 94.0% | 8.1% | Rs 0.60 |
+| `[0.3, 0.7]` | 1.6% | 93.5% | 9.6% | Rs 21.18 |
+| `[0.25, 0.75]` | 2.5% | 94.0% | 9.6% | Rs 21.55 |
+| `[0.2, 0.8]` | 2.8% | 94.0% | 9.6% | Rs 21.66 |
+| `[0.1, 0.9]` | 4.4% | 92.9% | 8.9% | Rs 35.65 |
+| `[0.05, 0.95]` | 7.8% | 94.0% | 12.6% | Rs 83.84 |
+| `[0.0, 1.01]` | 95.0% | 78.3% | 58.5% | Rs 767.22 |
 
 ## Audit chain
 

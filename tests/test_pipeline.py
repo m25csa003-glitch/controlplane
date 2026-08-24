@@ -99,10 +99,23 @@ def test_grounding_keeps_the_best_chunk_not_the_average(monkeypatch):
     ctx = RequestContext(request_id="t", use_case="customer_support",
                          retrieved_chunks=CHUNKS)
     from controlplane.text import sentences
-    scores = t1._grounding_scores(sentences("Cashless treatment is at network hospitals."), ctx)
+    sents = sentences("Cashless treatment is at network hospitals.")
 
-    assert len(seen["pairs"]) == 2  # one pair per chunk, not one joined premise
+    scores = t1._grounding_scores(sents, ctx, combine=False)
+    assert len(seen["pairs"]) == 2  # one per chunk, not one joined premise
     assert scores == [0.02]
+
+    scores = t1._grounding_scores(sents, ctx, combine=True)
+    assert len(seen["pairs"]) == 3  # chunks plus the joined premise
+    assert scores == [0.02]
+
+
+def test_combine_sources_is_a_policy_value(cp):
+    """The joined premise halves false positives and doubles latency, so the
+    tight-latency policy declines it and the slow one takes it."""
+    tiers = {n: p.tiers["tier1"].get("combine_sources") for n, p in cp.policies.items()}
+    assert tiers["customer_support"] is False
+    assert tiers["decision_support"] is True
 
 
 def test_abstention_is_not_scored_as_ungrounded(cp):

@@ -6,7 +6,33 @@ import time
 
 from ..schema import Signal
 
-DEFAULT_MODEL = os.getenv("CP_JUDGE_MODEL", "claude-opus-5")
+# The judge runs against whichever provider has a key. Which model each policy
+# uses is a policy decision, not a code one - see tier2.models in the YAML.
+DEFAULT_MODELS = {"anthropic": "claude-opus-5", "openai": "gpt-5.6-sol"}
+
+
+def _provider():
+    forced = os.getenv("CP_JUDGE_PROVIDER")
+    if forced:
+        return forced
+    if os.getenv("ANTHROPIC_API_KEY") or os.getenv("CP_API_KEY"):
+        return "anthropic"
+    if os.getenv("OPENAI_API_KEY"):
+        return "openai"
+    return None
+
+
+def _api_key(provider):
+    if provider == "anthropic":
+        return os.getenv("ANTHROPIC_API_KEY") or os.getenv("CP_API_KEY")
+    if provider == "openai":
+        return os.getenv("OPENAI_API_KEY")
+    return None
+
+
+def _model_for(cfg, provider):
+    models = cfg.get("models") or {}
+    return models.get(provider) or DEFAULT_MODELS.get(provider)
 
 VERDICT_SCHEMA = {
     "type": "object",
@@ -65,9 +91,11 @@ def run(text, ctx, policy, uncertain_signals, meter=None, breakdown=None):
 def _judge(claims, sources, cfg, meter, breakdown):
     if not claims:
         return [], [], "judge"
-    api_key = os.getenv("ANTHROPIC_API_KEY") or os.getenv("CP_API_KEY")
-    if api_key:
-        out = _api_judge(claims, sources, cfg, api_key, meter, breakdown)
+    provider = _provider()
+    key = _api_key(provider)
+    if provider and key:
+        judge = {"anthropic": _anthropic_judge, "openai": _openai_judge}.get(provider)
+        out = judge(claims, sources, cfg, key, meter, breakdown) if judge else None
         if out is not None:
             return out
     _model_cost(claims, sources, cfg, meter, breakdown)
@@ -88,29 +116,79 @@ def _model_cost(claims, sources, cfg, meter, breakdown):
     design rests on says nothing. Booked as modelled, never as billed."""
     if meter is None or breakdown is None:
         return
-    model = cfg.get("model", DEFAULT_MODEL)
+    provider = _provider() or "anthropic"
+    model = _model_for(cfg, provider)
     effort = cfg.get("effort", "medium")
     samples = max(1, int(cfg.get("samples", 1)))
     prompt = SYSTEM + sources + "\n".join(claims)
     in_tok, _ = meter.count_tokens(prompt, model)
     out_tok = OUTPUT_TOKENS.get(effort, 480) * len(claims)
     for _ in range(samples):
-        line = meter.llm_call("anthropic", model, in_tok, out_tok,
+        line = meter.llm_call(provider, model, in_tok, out_tok,
                               label="tier2_judge", method="modelled")
         line.verified = False
         breakdown.add(line)
 
 
-def _api_judge(claims, sources, cfg, api_key, meter, breakdown):
+def _prompt(claims, sources):
+    numbered = "\n".join(f"{i}. {c}" for i, c in enumerate(claims))
+    return f"SOURCES:\n{sources or '(none provided)'}\n\nCLAIMS:\n{numbered}"
+
+
+def _reduce(runs, claims, label):
+    """Self-consistency: median across samples, reason from the first run."""
+    scores = [statistics.median([r[i][0] for r in runs]) for i in range(len(claims))]
+    reasons = [runs[0][i][1] for i in range(len(claims))]
+    return scores, reasons, f"{label}x{len(runs)}"
+
+
+def _openai_judge(claims, sources, cfg, api_key, meter, breakdown):
+    try:
+        from openai import OpenAI
+    except ImportError:
+        print("[tier2] openai package not installed; using offline judge")
+        return None
+
+    model = _model_for(cfg, "openai")
+    samples = max(1, int(cfg.get("samples", 1)))
+    client = OpenAI(api_key=api_key, timeout=cfg.get("timeout_ms", 3000) / 1000)
+
+    runs = []
+    try:
+        for _ in range(samples):
+            resp = client.chat.completions.create(
+                model=model,
+                messages=[{"role": "system", "content": SYSTEM},
+                          {"role": "user", "content": _prompt(claims, sources)}],
+                response_format={
+                    "type": "json_schema",
+                    "json_schema": {"name": "grounding_verdicts", "strict": True,
+                                    "schema": VERDICT_SCHEMA},
+                },
+            )
+            runs.append(_parse_json(resp.choices[0].message.content, len(claims)))
+            if meter is not None and breakdown is not None and resp.usage:
+                breakdown.add(meter.llm_call(
+                    "openai", model,
+                    resp.usage.prompt_tokens, resp.usage.completion_tokens,
+                    label="tier2_judge",
+                ))
+    except Exception as exc:
+        print(f"[tier2] openai judge failed ({exc}); using offline judge")
+        return None
+
+    return _reduce(runs, claims, model)
+
+
+def _anthropic_judge(claims, sources, cfg, api_key, meter, breakdown):
     try:
         import anthropic
     except ImportError:
         return None
 
-    model = cfg.get("model", DEFAULT_MODEL)
+    model = _model_for(cfg, "anthropic")
     samples = int(cfg.get("samples", 1))
-    numbered = "\n".join(f"{i}. {c}" for i, c in enumerate(claims))
-    prompt = f"SOURCES:\n{sources or '(none provided)'}\n\nCLAIMS:\n{numbered}"
+    prompt = _prompt(claims, sources)
 
     client = anthropic.Anthropic(api_key=api_key, timeout=cfg.get("timeout_ms", 3000) / 1000)
     runs = []
@@ -135,17 +213,17 @@ def _api_judge(claims, sources, cfg, api_key, meter, breakdown):
                     label="tier2_judge",
                 ))
     except Exception as exc:
-        print(f"[tier2] judge call failed ({exc}); using offline judge")
+        print(f"[tier2] anthropic judge failed ({exc}); using offline judge")
         return None
 
-    # self-consistency: median across samples, reason from the first run
-    scores = [statistics.median([r[i][0] for r in runs]) for i in range(len(claims))]
-    reasons = [runs[0][i][1] for i in range(len(claims))]
-    return scores, reasons, f"{model}x{len(runs)}"
+    return _reduce(runs, claims, model)
 
 
 def _parse(resp, n):
-    text = next(b.text for b in resp.content if b.type == "text")
+    return _parse_json(next(b.text for b in resp.content if b.type == "text"), n)
+
+
+def _parse_json(text, n):
     data = json.loads(text)
     out = [(0.5, "no verdict returned")] * n
     for v in data.get("verdicts", []):

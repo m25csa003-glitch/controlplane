@@ -14,9 +14,12 @@ tiers:
     enabled: true
     checks: [grounding, safety, bias]
     uncertainty_band: [0.15, 0.85]
+    combine_sources: true   # 1 s budget affords the joined premise
   tier2:
     enabled: true
-    model: claude-haiku-4-5
+    models:                        # whichever provider has a key
+      anthropic: claude-haiku-4-5
+      openai: gpt-5.6-luna
     effort: low
     samples: 1
     max_escalation_rate: 0.02

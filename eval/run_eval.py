@@ -123,11 +123,40 @@ def sweep(cases, points=13):
     return out
 
 
+BANDS = [(0.5, 0.5), (0.4, 0.6), (0.3, 0.7), (0.25, 0.75), (0.2, 0.8),
+         (0.1, 0.9), (0.05, 0.95), (0.0, 1.01)]
+
+
+def band_sweep(cases):
+    """Widen the uncertainty band and watch what tier 2 buys.
+
+    At the configured band the judge runs on a few percent of responses and
+    changes nothing, which reads as the cascade not earning its keep. The
+    question is whether any band does, and at what price. This answers it with
+    a curve instead of an opinion."""
+    out = []
+    for lo, hi in BANDS:
+        def mutate(raw, lo=lo, hi=hi):
+            raw["tiers"]["tier1"]["uncertainty_band"] = [lo, hi]
+            return raw
+
+        name = f"band_{lo}_{hi}"
+        rows, _, _ = run_config(name, {"mutate": mutate, "audit_mode": False}, cases)
+        s = summarize(rows)
+        out.append({"band": f"[{lo}, {hi}]",
+                    "catch_rate": s["catch_rate"],
+                    "false_positive_rate": s["false_positive_rate"],
+                    "tier2_rate": s["tier2_rate"],
+                    "cost_inr": s["verification_cost_total_inr"]})
+        (RESULTS / f"audit_{name}.jsonl").unlink(missing_ok=True)
+    return out
+
+
 def pct(x):
     return f"{100 * x:.1f}%"
 
 
-def write_report(results, sweep_rows, cases, meta):
+def write_report(results, sweep_rows, band_rows, cases, meta):
     RESULTS.mkdir(parents=True, exist_ok=True)
     L = []
     L.append("# ControlPlane evaluation\n")
@@ -199,6 +228,15 @@ def write_report(results, sweep_rows, cases, meta):
     for s in sweep_rows:
         L.append(f"| {s['threshold']:.2f} | {pct(s['catch_rate'])} | "
                  f"{pct(s['false_positive_rate'])} | {pct(s['precision'])} |")
+
+    L.append("\n## What tier 2 buys, by band width\n")
+    L.append("`[0.5, 0.5]` is an empty band, so the judge never runs. "
+             "`[0.0, 1.01]` sends everything tier 1 flagged at all.\n")
+    L.append("\n| band | tier 2 rate | catch rate | false positive rate | verify cost |")
+    L.append("|---|---|---|---|---|")
+    for b in band_rows:
+        L.append(f"| `{b['band']}` | {pct(b['tier2_rate'])} | {pct(b['catch_rate'])} | "
+                 f"{pct(b['false_positive_rate'])} | Rs {b['cost_inr']:.2f} |")
 
     L.append("\n## Audit chain\n")
     for name, r in results.items():
@@ -275,6 +313,10 @@ def main():
     sweep_rows = sweep(cases)
     print("done")
 
+    print("sweeping tier 2 band ...", end=" ", flush=True)
+    band_rows = band_sweep(cases)
+    print("done")
+
     import os
     described = tier1_classifiers.describe()
     meta = {
@@ -291,8 +333,9 @@ def main():
         {"meta": meta | {"safety_model": bool(meta["safety_model"])},
          "configs": {k: v["summary"] for k, v in results.items()},
          "per_category": {k: v["per_category"] for k, v in results.items()},
-         "sweep": sweep_rows}, indent=2))
-    write_report(results, sweep_rows, cases, meta)
+         "sweep": sweep_rows,
+         "band_sweep": band_rows}, indent=2))
+    write_report(results, sweep_rows, band_rows, cases, meta)
     print(f"\nwrote {RESULTS / 'report.md'}")
     print(f"wrote {RESULTS / 'summary.json'}")
 
