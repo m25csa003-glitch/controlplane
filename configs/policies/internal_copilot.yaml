@@ -1,0 +1,35 @@
+use_case: internal_copilot
+description: Internal knowledge assistant for employees.
+
+latency_budget_ms: 1000
+streaming_mode: streaming        # full speed, correct inline if a check trips
+risk_appetite: medium
+
+tiers:
+  tier0:
+    enabled: true
+    checks: [pii, cost_meter]
+  tier1:
+    enabled: true
+    checks: [grounding, safety]
+    uncertainty_band: [0.15, 0.85]
+  tier2:
+    enabled: true
+    max_escalation_rate: 0.02
+    timeout_ms: 1500
+
+costs:
+  cost_of_being_wrong: 60         # INR, assumed: employee rework time
+  cost_of_human_review: 25
+
+actions:
+  pii_detected: annotate
+  ungrounded_claim: annotate
+  low_grounding_overall: annotate
+  safety_violation: block
+  uncertain: pass
+  default: pass
+
+audit:
+  retention_days: 90
+  log_full_response: false

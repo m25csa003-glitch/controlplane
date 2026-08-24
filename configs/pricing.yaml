@@ -1,0 +1,4 @@
+# Token prices used by the cost meter. Update before recording the demo.
+# Values are per 1M tokens, in USD. Source and date must be noted when filled in.
+providers: {}
+usd_to_inr: 0

@@ -1,0 +1,36 @@
+use_case: decision_support
+description: Embedded in a regulated workflow. Output feeds a decision with legal weight.
+
+latency_budget_ms: 3000          # correctness beats speed here
+streaming_mode: buffered
+risk_appetite: very_low
+
+tiers:
+  tier0:
+    enabled: true
+    checks: [pii, schema, cost_meter, policy_terms, acl_check]
+  tier1:
+    enabled: true
+    checks: [grounding, safety, bias]
+    uncertainty_band: [0.40, 0.90]   # wide band, escalate readily
+  tier2:
+    enabled: true
+    max_escalation_rate: 0.20
+    timeout_ms: 3000
+
+costs:
+  cost_of_being_wrong: 50000      # INR, assumed: regulatory exposure of one bad decision
+  cost_of_human_review: 200       # INR, assumed: reviewer with domain expertise
+
+actions:
+  pii_detected: block
+  ungrounded_claim: escalate
+  low_grounding_overall: escalate
+  safety_violation: block
+  uncertain: escalate
+  default: pass
+
+audit:
+  retention_days: 2555            # 7 years
+  log_full_response: true
+  hash_chain: strict

@@ -1,0 +1,13 @@
+fastapi
+uvicorn[standard]
+httpx
+pydantic
+pyyaml
+sqlalchemy
+torch
+transformers
+sentence-transformers
+onnxruntime
+presidio-analyzer
+presidio-anonymizer
+pytest

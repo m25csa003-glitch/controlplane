@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+*.db
+*.sqlite3
+eval/results/*.json
+eval/datasets/*
+!eval/datasets/.gitkeep
+dashboard/node_modules/
+dashboard/dist/
+.DS_Store
