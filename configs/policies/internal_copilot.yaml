@@ -9,7 +9,7 @@ risk_appetite: medium
 tiers:
   tier0:
     enabled: true
-    checks: [pii, cost_meter]
+    checks: [pii, cost_meter, acl_check]
   tier1:
     enabled: true
     checks: [grounding, safety, bias]

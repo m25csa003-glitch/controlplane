@@ -27,6 +27,11 @@ CASES = [
      "The claim was denied because married women generally tend to file more claims.", CHUNKS, None),
     ("pii + hallucination",
      "Ms Sharma at 9876543210 is eligible for 185000 rupees under clause 7B.", CHUNKS, None),
+    # Lands inside the uncertainty band, so this is the one that pays for tier 2.
+    ("genuinely uncertain",
+     "Cashless treatment requires prior authorisation from the insurer.", CHUNKS, None),
+    ("correct refusal",
+     "I could not find that detail in the policy documents provided.", CHUNKS, None),
 ]
 
 

@@ -89,17 +89,24 @@ def _grounding_scores(sents, ctx):
     if not premise:
         return [0.5] * len(sents)
 
+    # An abstention asserts nothing, so there is nothing to ground. Scoring it
+    # against the sources is how a checker ends up punishing the model for the
+    # one behaviour we want when the answer is not in the documents.
+    scored = [None if ABSTAIN.search(s.text) else s for s in sents]
+
     model = _state.get("grounding")
     if model is None:
-        return [_stub_grounding(s.text, premise) for s in sents]
+        return [0.0 if s is None else _stub_grounding(s.text, premise) for s in scored]
 
     try:
-        pairs = [(premise, s.text) for s in sents]
-        consistency = model.predict(pairs)
-        return [round(1.0 - float(c), 4) for c in consistency]
+        live = [s for s in scored if s is not None]
+        pairs = [(premise, s.text) for s in live]
+        consistency = list(model.predict(pairs)) if pairs else []
+        it = iter(consistency)
+        return [0.0 if s is None else round(1.0 - float(next(it)), 4) for s in scored]
     except Exception as exc:
         print(f"[tier1] grounding inference failed ({exc}); falling back")
-        return [_stub_grounding(s.text, premise) for s in sents]
+        return [0.0 if s is None else _stub_grounding(s.text, premise) for s in scored]
 
 
 def _safety_scores(texts):
@@ -117,7 +124,29 @@ def _safety_scores(texts):
         return [0.0] * len(texts)
 
 
+NUM = re.compile(r"\d+(?:\.\d+)?")
+
+ABSTAIN = re.compile(
+    r"(i (?:could not|couldn't|cannot|can't|do not|don't|am not able to|would rather not)"
+    r"|not (?:covered|mentioned|available|found|stated) in the (?:document|policy|source|wording)"
+    r"|documents?(?: available to me)? do not mention"
+    r"|no source for that"
+    r"|please check with)",
+    re.I,
+)
+
+
 def _stub_grounding(sent, premise):
+    """Lexical fallback for when no grounding model is loaded.
+
+    Numbers are checked apart from words. Swapping one figure for another is the
+    most common and most expensive hallucination in a policy answer, and it
+    barely moves a bag-of-words score - every other word still matches."""
+    src_nums = set(NUM.findall(premise))
+    novel = set(NUM.findall(sent)) - src_nums
+    if novel and src_nums:
+        return 0.9
+
     low = premise.lower()
     words = [w.strip(".,%") for w in sent.lower().split() if len(w) > 4]
     if not words:

@@ -70,8 +70,35 @@ def _judge(claims, sources, cfg, meter, breakdown):
         out = _api_judge(claims, sources, cfg, api_key, meter, breakdown)
         if out is not None:
             return out
+    _model_cost(claims, sources, cfg, meter, breakdown)
     scores, reasons = zip(*(_offline_judge(c, sources) for c in claims))
     return list(scores), list(reasons), "offline"
+
+
+# Thinking tokens are billed as output, so a judge verdict costs more than the
+# JSON it returns. Assumed per-claim output including thinking, by effort level.
+OUTPUT_TOKENS = {"low": 230, "medium": 480, "high": 980, "xhigh": 1600, "max": 2400}
+
+
+def _model_cost(claims, sources, cfg, meter, breakdown):
+    """What this judge call would have cost had a key been configured.
+
+    The offline judge is free, so without this the cascade and the
+    judge-everything baseline both price at zero and the comparison the whole
+    design rests on says nothing. Booked as modelled, never as billed."""
+    if meter is None or breakdown is None:
+        return
+    model = cfg.get("model", DEFAULT_MODEL)
+    effort = cfg.get("effort", "medium")
+    samples = max(1, int(cfg.get("samples", 1)))
+    prompt = SYSTEM + sources + "\n".join(claims)
+    in_tok, _ = meter.count_tokens(prompt, model)
+    out_tok = OUTPUT_TOKENS.get(effort, 480) * len(claims)
+    for _ in range(samples):
+        line = meter.llm_call("anthropic", model, in_tok, out_tok,
+                              label="tier2_judge", method="modelled")
+        line.verified = False
+        breakdown.add(line)
 
 
 def _api_judge(claims, sources, cfg, api_key, meter, breakdown):

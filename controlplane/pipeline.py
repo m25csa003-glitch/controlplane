@@ -6,7 +6,8 @@ from .tiers import tier0_rules, tier1_classifiers, tier2_judge
 from .router.router import decide
 from .audit.log import AuditLog
 from .cost.meter import CostMeter, CostBreakdown
-from .schema import RequestContext, Category
+from .text import sentences as split_sentences
+from .schema import RequestContext, Category, Signal
 
 
 class ControlPlane:
@@ -17,7 +18,10 @@ class ControlPlane:
 
     def verify(self, text, use_case, retrieved_chunks=None, allowed_chunk_ids=None,
                user_id="anon", llm_cost_inr=0.0, expects_json=False, usage=None,
-               model=None, provider="anthropic"):
+               model=None, provider="anthropic", audit_mode=False):
+        """audit_mode sends every sentence to tier 2 regardless of what tier 1
+        thought. It is what a spot audit looks like, and it is the baseline the
+        cascade is measured against."""
         policy = self.policies[use_case]
         ctx = RequestContext(
             request_id=str(uuid.uuid4())[:8],
@@ -44,12 +48,17 @@ class ControlPlane:
             tiers_run.append(1)
 
         lo, hi = policy.band()
-        uncertain = [s for s in signals
-                     if s.category == Category.GROUNDING and lo <= s.score < hi]
+        if audit_mode:
+            targets = [Signal(Category.GROUNDING, 0.5, 1, s.span, s.text[:80])
+                       for s in split_sentences(text)]
+            signals = [x for x in signals if x.category != Category.GROUNDING]
+        else:
+            targets = [s for s in signals
+                       if s.category == Category.GROUNDING and lo <= s.score < hi]
 
-        if policy.tier_enabled(2) and uncertain:
-            s, ms = tier2_judge.run(text, ctx, policy, uncertain, self.meter, breakdown)
-            replaced = {id(x) for x in uncertain}
+        if policy.tier_enabled(2) and targets:
+            s, ms = tier2_judge.run(text, ctx, policy, targets, self.meter, breakdown)
+            replaced = {id(x) for x in targets}
             signals = [x for x in signals if id(x) not in replaced] + s
             tiers_run.append(2)
 

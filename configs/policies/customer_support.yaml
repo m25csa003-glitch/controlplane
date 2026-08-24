@@ -9,7 +9,7 @@ risk_appetite: low
 tiers:
   tier0:
     enabled: true
-    checks: [pii, schema, cost_meter, policy_terms]
+    checks: [pii, schema, cost_meter, policy_terms, acl_check]
   tier1:
     enabled: true
     checks: [grounding, safety, bias]

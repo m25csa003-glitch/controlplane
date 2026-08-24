@@ -5,9 +5,9 @@ venv/
 .env
 *.db
 *.sqlite3
-eval/results/*.json
-eval/datasets/*
-!eval/datasets/.gitkeep
+# The eval set and its report are evidence, so they are committed. The per-run
+# audit logs are intermediate and are not.
+eval/results/audit_*.jsonl
 dashboard/node_modules/
 dashboard/dist/
 .DS_Store
