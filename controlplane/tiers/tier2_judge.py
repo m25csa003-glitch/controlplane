@@ -25,10 +25,22 @@ def reset_stats():
     STATS.update(api_calls=0, api_failures=0, offline=0)
 
 
+PROVIDERS = ("anthropic", "openai")
+
+
 def _provider():
+    """Which provider the judge will use, or None for the offline judge.
+
+    CP_JUDGE_PROVIDER is validated rather than trusted. A typo there used to
+    reach the cost meter as an unknown provider and take down verification with
+    a KeyError - an env var should not be able to break the request path."""
     forced = os.getenv("CP_JUDGE_PROVIDER")
     if forced:
-        return forced
+        if forced in PROVIDERS:
+            return forced
+        print(f"[tier2] CP_JUDGE_PROVIDER={forced!r} is not one of {PROVIDERS}; "
+              "using the offline judge")
+        return None
     if os.getenv("ANTHROPIC_API_KEY") or os.getenv("CP_API_KEY"):
         return "anthropic"
     if os.getenv("OPENAI_API_KEY"):
@@ -154,6 +166,8 @@ def _model_cost(claims, sources, cfg, meter, breakdown):
         return
     provider = _provider() or "anthropic"
     model = _model_for(cfg, provider)
+    if not model:
+        return
     effort = cfg.get("effort", "medium")
     samples = max(1, int(cfg.get("samples", 1)))
     prompt = SYSTEM + sources + "\n".join(claims)
@@ -161,8 +175,14 @@ def _model_cost(claims, sources, cfg, meter, breakdown):
     per_claim, measured = _output_tokens(provider, effort)
     out_tok = per_claim * len(claims)
     for _ in range(samples):
-        line = meter.llm_call(provider, model, in_tok, out_tok, label="tier2_judge",
-                              method="modelled" if measured else "modelled_estimated")
+        try:
+            line = meter.llm_call(provider, model, in_tok, out_tok, label="tier2_judge",
+                                  method="modelled" if measured else "modelled_estimated")
+        except KeyError as exc:
+            # No price for this model. Book nothing rather than guess, and
+            # certainly do not fail the verification over a costing footnote.
+            print(f"[tier2] {exc}")
+            return
         line.verified = False
         breakdown.add(line)
 

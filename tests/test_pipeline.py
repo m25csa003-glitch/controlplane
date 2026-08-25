@@ -170,6 +170,16 @@ def test_modelled_judge_cost_is_flagged_unverified(cp):
     assert all(l["method"].startswith("modelled") and not l["verified"] for l in judge)
 
 
+def test_a_bogus_provider_falls_back_instead_of_crashing(cp, monkeypatch):
+    """A typo in CP_JUDGE_PROVIDER reached the cost meter as an unknown provider
+    and took verification down with a KeyError. An env var must not be able to
+    break the request path."""
+    monkeypatch.setenv("CP_JUDGE_PROVIDER", "opemai")
+    v = verify(cp, "Cashless treatment requires prior authorisation from the insurer.")
+    assert v.action is not None
+    assert 2 in v.tiers_run
+
+
 @pytest.mark.live
 def test_live_judge_catches_a_changed_number(cp):
     """The offline judge and the real one have to agree on the obvious case,
