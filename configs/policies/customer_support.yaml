@@ -48,6 +48,8 @@ actions:
   default: pass
 
 audit:
+  audit_sample_rate: 0.05   # share of PASSED responses also sent for review,
+                            # so retuning has evidence about what it let through
   retention_days: 365
   log_full_response: true
 

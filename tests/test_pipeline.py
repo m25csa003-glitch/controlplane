@@ -167,7 +167,7 @@ def test_modelled_judge_cost_is_flagged_unverified(cp):
     assert 2 in v.tiers_run, v.tiers_run
     judge = [l for l in v.cost_detail["lines"] if l["label"] == "tier2_judge"]
     assert judge, v.cost_detail
-    assert all(l["method"] == "modelled" and not l["verified"] for l in judge)
+    assert all(l["method"].startswith("modelled") and not l["verified"] for l in judge)
 
 
 @pytest.mark.live

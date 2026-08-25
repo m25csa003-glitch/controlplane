@@ -120,9 +120,28 @@ def _judge(claims, sources, cfg, meter, breakdown):
     return list(scores), list(reasons), "offline"
 
 
-# Thinking tokens are billed as output, so a judge verdict costs more than the
-# JSON it returns. Assumed per-claim output including thinking, by effort level.
-OUTPUT_TOKENS = {"low": 230, "medium": 480, "high": 980, "xhigh": 1600, "max": 2400}
+# Output tokens per claim, used only to model what a judge call would have cost
+# when no key is configured.
+#
+# The first version of this guessed 230 at low effort and was wrong by a factor
+# of five, which made the modelled cascade cost look 19x worse than the billed
+# one and led to the wrong conclusion about whether tier 2 pays for itself.
+OUTPUT_TOKENS = {
+    # Measured 2026-08-25 against gpt-5.6-luna and gpt-5.6-sol: 30-48 tokens
+    # per claim, flat across 1, 2 and 4 claims.
+    "openai": 45,
+    # Not measured - there is no Anthropic key on this machine. Adaptive
+    # thinking bills thinking as output, so these are deliberately the
+    # pessimistic end. Measure before quoting an Anthropic number.
+    "anthropic": {"low": 230, "medium": 480, "high": 980, "xhigh": 1600, "max": 2400},
+}
+
+
+def _output_tokens(provider, effort):
+    table = OUTPUT_TOKENS.get(provider, OUTPUT_TOKENS["anthropic"])
+    if isinstance(table, dict):
+        return table.get(effort, 480), False       # estimated
+    return table, True                             # measured
 
 
 def _model_cost(claims, sources, cfg, meter, breakdown):
@@ -139,10 +158,11 @@ def _model_cost(claims, sources, cfg, meter, breakdown):
     samples = max(1, int(cfg.get("samples", 1)))
     prompt = SYSTEM + sources + "\n".join(claims)
     in_tok, _ = meter.count_tokens(prompt, model)
-    out_tok = OUTPUT_TOKENS.get(effort, 480) * len(claims)
+    per_claim, measured = _output_tokens(provider, effort)
+    out_tok = per_claim * len(claims)
     for _ in range(samples):
-        line = meter.llm_call(provider, model, in_tok, out_tok,
-                              label="tier2_judge", method="modelled")
+        line = meter.llm_call(provider, model, in_tok, out_tok, label="tier2_judge",
+                              method="modelled" if measured else "modelled_estimated")
         line.verified = False
         breakdown.add(line)
 

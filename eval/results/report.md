@@ -1,6 +1,6 @@
 # ControlPlane evaluation
 
-Generated 2026-08-25 02:21  
+Generated 2026-08-25 03:29  
 
 Dataset: `controlplane_eval_v1.jsonl`, 319 cases  
 
@@ -16,15 +16,12 @@ Tier 2 judge: **offline**
 
 | config | catch rate | false positive rate | precision | F1 | tier 2 rate | p95 latency | verify cost (total) | verify as % of LLM spend |
 |---|---|---|---|---|---|---|---|---|
-| `tier0_only` | 22.8% | 0.0% | 100.0% | 37.2% | 0.0% | 0.02 ms | Rs 0.0000 | 0.000% |
-| `tier1_no_judge` | 93.5% | 7.4% | 94.5% | 94.0% | 0.0% | 142.25 ms | Rs 0.3545 | 0.325% |
-| `cascade` | 93.5% | 7.4% | 94.5% | 94.0% | 2.8% | 139.35 ms | Rs 21.5218 | 19.734% |
-| `judge_everything` | 73.4% | 42.2% | 70.3% | 71.8% | 100.0% | 157.39 ms | Rs 815.8516 | 748.078% |
+| `tier0_only` | 22.8% | 0.0% | 100.0% | 37.2% | 0.0% | 0.01 ms | Rs 0.0000 | 0.000% |
+| `tier1_no_judge` | 93.5% | 7.4% | 94.5% | 94.0% | 0.0% | 162.88 ms | Rs 0.3947 | 0.362% |
+| `cascade` | 94.6% | 7.4% | 94.6% | 94.6% | 2.8% | 183.97 ms | Rs 1.1322 | 1.038% |
+| `judge_everything` | 94.6% | 15.6% | 89.2% | 91.8% | 100.0% | 4071.18 ms | Rs 30.1440 | 27.640% |
 
-**Cascade costs 2.6% of judging everything**, at 93.5% catch rate against 73.4%. Tier 2 ran on 2.8% of responses.
-
-
-**Tier 2 changed no decisions on this set.** It ran on 2.8% of responses and cost Rs 21.17 to reach the same verdicts tier 1 already had. Two things follow: the uncertainty band is currently too narrow to catch the cases that would benefit, and the offline judge is not strong enough to overturn tier 1 anyway. The band is a policy value, so this is a tuning result, not a code change — but it is not yet earning its cost.
+**Cascade costs 3.8% of judging everything**, at 94.6% catch rate against 94.6%. Tier 2 ran on 2.8% of responses.
 
 
 ## Where the errors are
@@ -58,12 +55,12 @@ true pos 172 · false pos 10 · false neg 12 · true neg 125
 
 ### `cascade`
 
-true pos 172 · false pos 10 · false neg 12 · true neg 125
+true pos 174 · false pos 10 · false neg 10 · true neg 125
 
 
 | category | labelled | recall | co-fires on unlabelled |
 |---|---|---|---|
-| grounding | 127 | 90.6% | 57 (29.7%) |
+| grounding | 127 | 92.1% | 56 (29.2%) |
 | pii | 30 | 100.0% | 0 (0.0%) |
 | acl | 12 | 100.0% | 0 (0.0%) |
 | bias | 18 | 88.9% | 0 (0.0%) |
@@ -71,12 +68,12 @@ true pos 172 · false pos 10 · false neg 12 · true neg 125
 
 ### `judge_everything`
 
-true pos 135 · false pos 57 · false neg 49 · true neg 78
+true pos 174 · false pos 21 · false neg 10 · true neg 114
 
 
 | category | labelled | recall | co-fires on unlabelled |
 |---|---|---|---|
-| grounding | 127 | 75.6% | 133 (69.3%) |
+| grounding | 127 | 96.1% | 81 (42.2%) |
 | pii | 30 | 100.0% | 0 (0.0%) |
 | acl | 12 | 100.0% | 0 (0.0%) |
 | bias | 18 | 88.9% | 0 (0.0%) |
@@ -89,7 +86,7 @@ true pos 135 · false pos 57 · false neg 49 · true neg 78
 | acl_breach | 12 | flag | 12 | 100.0% |
 | bias_benign | 15 | pass | 15 | 100.0% |
 | bias_decision | 18 | flag | 18 | 100.0% |
-| conditional_flip | 15 | flag | 13 | 86.7% |
+| conditional_flip | 15 | flag | 14 | 93.3% |
 | entity_fabrication | 15 | flag | 15 | 100.0% |
 | fabricated_clause | 15 | flag | 15 | 100.0% |
 | grounded_exact | 15 | pass | 15 | 100.0% |
@@ -102,7 +99,7 @@ true pos 135 · false pos 57 · false neg 49 · true neg 78
 | partial_truth | 15 | flag | 15 | 100.0% |
 | pii_leak | 18 | flag | 18 | 100.0% |
 | pii_plus_hallucination | 12 | flag | 12 | 100.0% |
-| quantifier_flip | 15 | flag | 7 | 46.7% |
+| quantifier_flip | 15 | flag | 8 | 53.3% |
 | refusal | 15 | pass | 15 | 100.0% |
 | safety | 9 | flag | 9 | 100.0% |
 | unit_swap | 10 | flag | 8 | 80.0% |
@@ -136,14 +133,40 @@ Tier 1 alone, threshold swept. The brief asks for this tradeoff to be exposed ra
 
 | band | tier 2 rate | catch rate | false positive rate | verify cost |
 |---|---|---|---|---|
-| `[0.5, 0.5]` | 0.0% | 94.0% | 8.1% | Rs 0.50 |
-| `[0.4, 0.6]` | 0.3% | 94.0% | 8.1% | Rs 0.60 |
-| `[0.3, 0.7]` | 1.6% | 93.5% | 9.6% | Rs 21.18 |
-| `[0.25, 0.75]` | 2.5% | 94.0% | 9.6% | Rs 21.55 |
-| `[0.2, 0.8]` | 2.8% | 94.0% | 9.6% | Rs 21.66 |
-| `[0.1, 0.9]` | 4.4% | 92.9% | 8.9% | Rs 35.65 |
-| `[0.05, 0.95]` | 7.8% | 94.0% | 12.6% | Rs 83.84 |
-| `[0.0, 1.01]` | 95.0% | 78.3% | 58.5% | Rs 767.22 |
+| `[0.5, 0.5]` | 0.0% | 94.0% | 8.1% | Rs 0.54 |
+| `[0.4, 0.6]` | 0.3% | 94.0% | 8.1% | Rs 0.52 |
+| `[0.3, 0.7]` | 1.6% | 94.0% | 8.9% | Rs 1.31 |
+| `[0.25, 0.75]` | 2.5% | 94.6% | 8.1% | Rs 1.25 |
+| `[0.2, 0.8]` | 2.8% | 94.6% | 8.1% | Rs 1.18 |
+| `[0.1, 0.9]` | 4.4% | 94.0% | 8.1% | Rs 1.71 |
+| `[0.05, 0.95]` | 7.8% | 94.6% | 9.6% | Rs 3.55 |
+| `[0.0, 1.01]` | 95.0% | 77.7% | 17.0% | Rs 34.43 |
+
+## Latency against the policy budget
+
+`latency_budget_ms` is the ceiling each policy sets on added latency for the clean path. p95 below is measured across all responses in that use case, judge calls included.
+
+
+| use case | budget | p95 measured | p95 when tier 2 ran | verdict |
+|---|---|---|---|---|
+| customer_support | 300 ms | 90 ms | n/a | within budget |
+| decision_support | 3000 ms | 194 ms | 2970 ms | within budget |
+| internal_copilot | 1000 ms | 1187 ms | 3396 ms | **over budget** |
+
+A judge call is 1.3 s on the cheap model and 3.1 s on the strong one. No amount of tuning fits that inside a 300 ms customer-support budget. Tier 2 is therefore not an inline step for a latency-bound use case - it has to run beside the response or after it, which is what the streaming path has to solve. The clean path, where tier 2 does not run at all, stays inside budget; it is only the escalated few percent that blow it.
+
+
+## Judge calls
+
+A judge call that fails falls back to the offline judge silently. If `failed` is not zero, the numbers above are a blend of two different judges and should not be read as an API result.
+
+
+| config | api calls | failed | offline |
+|---|---|---|---|
+| `tier0_only` | 0 | 0 | 0 |
+| `tier1_no_judge` | 0 | 0 | 0 |
+| `cascade` | 9 | 0 | 0 |
+| `judge_everything` | 319 | 0 | 0 |
 
 ## Audit chain
 
