@@ -23,8 +23,10 @@ import httpx
 
 ROOT = Path(__file__).resolve().parents[1]
 DATASET = ROOT / "eval" / "datasets" / "controlplane_eval_v1.jsonl"
-BASE = sys.argv[1] if len(sys.argv) > 1 else "http://localhost:8000"
-RATE = float(sys.argv[2]) if len(sys.argv) > 2 else 1.6      # responses/second
+ARGS = [a for a in sys.argv[1:] if not a.startswith("--")]
+BASE = ARGS[0] if ARGS else "http://localhost:8000"
+RATE = float(ARGS[1]) if len(ARGS) > 1 else 1.6              # responses/second
+UNCERTAIN = "--uncertain" in sys.argv
 
 
 def main():
@@ -32,6 +34,18 @@ def main():
         sys.exit("dataset missing. Run: python3 eval/build_dataset.py")
     cases = [json.loads(l) for l in DATASET.open() if l.strip()]
     rng = random.Random()
+
+    if UNCERTAIN:
+        # Only 2.8% of responses land inside an uncertainty band, so a random
+        # replay shows tier 2 roughly never - which is correct behaviour and a
+        # poor demo. These are the kinds that actually reach the judge.
+        kinds = {"multi_hop", "quantifier_flip", "hedged_correct",
+                 "conditional_flip", "entity_fabrication", "grounded_paraphrase",
+                 "pii_leak"}
+        cases = [c for c in cases if c["kind"] in kinds]
+        print(f"--uncertain: replaying {len(cases)} cases of the kinds that "
+              f"reach tier 2. Escalation and tier 2 rates on screen will be far "
+              f"above what random traffic produces.")
 
     try:
         httpx.get(f"{BASE}/health", timeout=5).raise_for_status()

@@ -62,3 +62,27 @@ What the dashboard shows:
 
 Tabs filter to one use case. State is in memory only — restarting the gateway
 clears the feed and keeps the audit log, which is the right way round.
+
+## Seeing tier 2 work
+
+Tier 2 runs on 2.8% of responses, so a random replay shows it roughly never.
+That is correct behaviour and a poor demo. Two ways to see it:
+
+    python3 demo/run_judge.py --live
+
+Finds every response that lands inside an uncertainty band and shows what
+tier 1 scored, what the judge said and why, and whether the judge changed the
+answer for better or worse. On the current eval set it changes 3 of 9 verdicts,
+all three corrections.
+
+    python3 demo/feed_dashboard.py --uncertain
+
+Biases the dashboard feed toward the case kinds that reach the judge, so tier 2
+rate and judge latency are visible on screen. Say out loud that the rates are
+above what random traffic produces — the flag exists to make a rare path
+visible, not to flatter it.
+
+The cases that land in the band are not random: they are multi-hop claims,
+quantifier flips, hedged-but-correct statements and fabricated details about
+named people. Those are exactly the kinds tier 1 scores worst on in
+`eval/results/report.md`, which is the band selecting the right work.

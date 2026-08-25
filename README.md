@@ -28,6 +28,7 @@ For the real thing:
 Other entry points:
 
     python3 demo/run_streaming.py --models  # verification beside the token stream
+    python3 demo/run_judge.py --live        # what tier 2 is for, with its reasoning
     python3 demo/run_feedback.py            # reviews retuning thresholds
     uvicorn controlplane.proxy.gateway:app  # gateway + dashboard
     python3 eval/run_eval.py                # the full benchmark, ~45 min with a key

@@ -83,6 +83,16 @@ Then scroll to the weaknesses section:
 > wrote this test set ourselves — an earlier version scored a hundred percent on
 > everything, which is why the adversarial cases exist.
 
+## 2:10 — What the judge is for (20s)
+
+    python3 demo/run_judge.py --live
+
+> Tier 2 runs on under three percent of responses — the ones tier 1 is
+> genuinely unsure about. Here it is on those: it changed three verdicts, all
+> three corrections, and it says why. "Source requires sign-off only for claims
+> above five lakh, not claims up to it." That is the quantifier flip tier 1
+> misses half the time.
+
 ## 2:25 — The loop closing (25s)
 
     python3 demo/run_feedback.py
