@@ -3,12 +3,16 @@ import os
 import time
 import asyncio
 
+from pathlib import Path
+
 import httpx
 from fastapi import FastAPI, Request, Header
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 
 from ..pipeline import ControlPlane
+from ..tiers import tier1_classifiers
 from ..streaming import StreamingVerifier
+from ..telemetry import Telemetry
 from ..schema import Action
 
 UPSTREAM = os.getenv("CP_UPSTREAM", "mock")
@@ -22,12 +26,66 @@ ENDPOINTS = {
 }
 
 app = FastAPI(title="ControlPlane Gateway")
-cp = ControlPlane(audit_path="audit.jsonl")
+telemetry = Telemetry()
+cp = ControlPlane(audit_path="audit.jsonl", listener=telemetry.record)
+DASHBOARD = Path(__file__).resolve().parents[2] / "dashboard" / "index.html"
+
+
+@app.on_event("startup")
+def _load_tier1():
+    """Load the classifiers before serving.
+
+    Without them grounding falls back to lexical overlap, which lands far more
+    responses inside the uncertainty band - tier 2 fired on 57% of traffic
+    instead of 2.8%, every one of those a paid judge call at 1.3s. A server that
+    quietly does that is worse than one that takes 7s to start.
+
+    CP_SKIP_MODELS=1 for a machine that has none; the fallback is still correct,
+    just slower and dearer, and /health says which mode is live."""
+    if os.getenv("CP_SKIP_MODELS"):
+        print("[gateway] CP_SKIP_MODELS set; tier 1 runs on the lexical fallback")
+        return
+    tier1_classifiers.load_models()
 
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "upstream": UPSTREAM, "use_cases": list(cp.policies)}
+    return {"status": "ok", "upstream": UPSTREAM, "use_cases": list(cp.policies),
+            "tier1": tier1_classifiers.describe()}
+
+
+@app.get("/dashboard")
+def dashboard():
+    return FileResponse(DASHBOARD)
+
+
+@app.get("/dashboard/stats")
+def dashboard_stats():
+    return {
+        "snapshot": telemetry.snapshot(cp.policies),
+        "queue": telemetry.queue(),
+        "recent": list(telemetry.recent)[:120],
+    }
+
+
+@app.get("/dashboard/events")
+async def dashboard_events():
+    """One SSE stream per connected operator."""
+    async def feed():
+        q = telemetry.subscribe()
+        try:
+            while True:
+                try:
+                    row = await asyncio.wait_for(q.get(), timeout=20)
+                    yield f"data: {json.dumps(row)}\n\n"
+                except asyncio.TimeoutError:
+                    yield ": keepalive\n\n"
+        finally:
+            telemetry.unsubscribe(q)
+
+    return StreamingResponse(feed(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache",
+                                      "X-Accel-Buffering": "no"})
 
 
 @app.get("/audit/verify")
@@ -56,7 +114,7 @@ async def chat_completions(
         )
 
     upstream_start = time.perf_counter()
-    text, usage = await _call_upstream(body)
+    text, usage = await _call_upstream(body, extras)
     upstream_ms = (time.perf_counter() - upstream_start) * 1000
 
     verdict = cp.verify(
@@ -65,6 +123,8 @@ async def chat_completions(
         retrieved_chunks=extras.get("retrieved_chunks"),
         allowed_chunk_ids=set(extras["allowed_chunk_ids"]) if extras.get("allowed_chunk_ids") else None,
         user_id=extras.get("user_id", "anon"),
+        usage=usage, model=extras.get("price_as", "claude-sonnet-5"),
+        provider=extras.get("price_provider", "anthropic"),
     )
 
     delivered = _apply_action(text, verdict)
@@ -103,12 +163,18 @@ def _apply_action(text, verdict):
     return text
 
 
-async def _call_upstream(body):
+async def _call_upstream(body, extras=None):
     if UPSTREAM == "mock":
-        await asyncio.sleep(0.4)
+        await asyncio.sleep(0.05)
+        # A caller replaying a fixture supplies the response it wants checked.
+        # Without this the mock answers everything with the same sentence and
+        # the dashboard shows one verdict repeated.
+        canned = (extras or {}).get("mock_response")
+        if canned:
+            return canned, {"prompt_tokens": 820, "completion_tokens": 95}
         msgs = body.get("messages", [])
         last = msgs[-1]["content"] if msgs else ""
-        return _mock_reply(last), {"prompt_tokens": 0, "completion_tokens": 0}
+        return _mock_reply(last), {"prompt_tokens": 820, "completion_tokens": 95}
 
     headers = {"Content-Type": "application/json"}
     if UPSTREAM == "openai":
@@ -173,6 +239,7 @@ async def _stream_and_verify(body, use_case, extras):
 
     verdict = verifier.verdict
     cp.audit.append(verdict.to_record(), policy_version=cp.policies[use_case].version)
+    telemetry.record(verdict)
 
     # In streaming mode the caller has already seen the text, so a late verdict
     # is a correction rather than a gate. Say which it was.

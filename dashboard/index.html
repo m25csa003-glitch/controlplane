@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ControlPlane Operations</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+:root{
+  --ground:#F7F8FA; --surface:#FFFFFF; --raised:#EEF1F5;
+  --ink:#16202B; --body:#2E3C49; --muted:#5C6B7A; --faint:#8A97A3;
+  --rule:#DCE2E8; --rule-strong:#C3CDD6;
+  --accent:#0E7C86; --accent-soft:#E2F1F2;
+  --pass:#2F7D5D; --pass-bg:#E4F0EA;
+  --soft:#9A6410; --soft-bg:#F5EDDF;
+  --hard:#A9392C; --hard-bg:#F7E6E3;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --ground:#0E1519; --surface:#16202B; --raised:#1D2A36;
+  --ink:#E7EDF1; --body:#C3CFD8; --muted:#8FA0AD; --faint:#6B7B88;
+  --rule:#26333F; --rule-strong:#374654;
+  --accent:#45B3BD; --accent-soft:#123238;
+  --pass:#5EB98D; --pass-bg:#15302A;
+  --soft:#D3A24E; --soft-bg:#2E2A1E;
+  --hard:#E0796A; --hard-bg:#33201D;
+}}
+:root[data-theme="dark"]{
+  --ground:#0E1519; --surface:#16202B; --raised:#1D2A36;
+  --ink:#E7EDF1; --body:#C3CFD8; --muted:#8FA0AD; --faint:#6B7B88;
+  --rule:#26333F; --rule-strong:#374654;
+  --accent:#45B3BD; --accent-soft:#123238;
+  --pass:#5EB98D; --pass-bg:#15302A;
+  --soft:#D3A24E; --soft-bg:#2E2A1E;
+  --hard:#E0796A; --hard-bg:#33201D;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--body);
+  font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:13px;line-height:1.5}
+.wrap{max-width:1240px;margin:0 auto;padding:0 20px 64px}
+
+header{display:flex;align-items:baseline;gap:18px;flex-wrap:wrap;
+  padding:22px 0 16px;border-bottom:2px solid var(--ink);margin-bottom:22px}
+h1{font-family:Archivo,system-ui,sans-serif;font-weight:700;font-size:21px;
+  letter-spacing:-.02em;color:var(--ink);margin:0}
+.live{display:flex;align-items:center;gap:7px;font-size:11px;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--muted)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--faint)}
+.dot.on{background:var(--pass);box-shadow:0 0 0 3px var(--pass-bg)}
+@media (prefers-reduced-motion:no-preference){.dot.on{animation:pulse 2.4s ease-in-out infinite}}
+@keyframes pulse{50%{opacity:.45}}
+header .sp{margin-left:auto;color:var(--faint);font-size:11.5px}
+
+.tabs{display:flex;gap:2px;margin-bottom:18px;flex-wrap:wrap}
+.tab{font:inherit;font-weight:500;background:transparent;border:1px solid var(--rule);
+  color:var(--muted);padding:7px 15px;cursor:pointer;border-radius:4px}
+.tab[aria-selected="true"]{background:var(--ink);border-color:var(--ink);color:var(--ground)}
+.tab:hover:not([aria-selected="true"]){border-color:var(--rule-strong);color:var(--body)}
+
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));
+  gap:10px;margin-bottom:22px}
+.tile{background:var(--surface);border:1px solid var(--rule);border-radius:5px;padding:13px 15px}
+.tile .k{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--faint);
+  margin-bottom:7px}
+.tile .v{font-family:Archivo,system-ui,sans-serif;font-size:25px;font-weight:600;
+  color:var(--ink);font-variant-numeric:tabular-nums;line-height:1.1}
+.tile .s{font-size:11.5px;color:var(--muted);margin-top:4px}
+.tile.alert{border-color:var(--hard);background:var(--hard-bg)}
+.tile.alert .v{color:var(--hard)}
+
+/* the meter is the point: a number plus where it sits against its limit */
+.meter{height:3px;background:var(--rule);border-radius:2px;margin-top:9px;overflow:hidden}
+.meter i{display:block;height:100%;background:var(--accent);border-radius:2px;
+  transition:width .4s ease}
+.meter i.over{background:var(--hard)}
+
+h2{font-family:Archivo,system-ui,sans-serif;font-size:13px;font-weight:600;
+  letter-spacing:.02em;color:var(--ink);margin:0 0 10px;
+  display:flex;align-items:baseline;gap:9px}
+h2 .c{font-size:11px;font-weight:400;color:var(--faint)}
+.cols{display:grid;grid-template-columns:1.35fr 1fr;gap:18px}
+@media (max-width:900px){.cols{grid-template-columns:1fr}}
+
+.panel{background:var(--surface);border:1px solid var(--rule);border-radius:5px;
+  overflow:hidden}
+.scroll{max-height:460px;overflow:auto}
+.row{display:grid;grid-template-columns:58px 1fr auto;gap:11px;align-items:baseline;
+  padding:9px 13px;border-bottom:1px solid var(--rule)}
+.row:last-child{border-bottom:none}
+.row.new{animation:in .45s ease}
+@media (prefers-reduced-motion:reduce){.row.new{animation:none}}
+@keyframes in{from{background:var(--accent-soft)}}
+.rid{color:var(--faint);font-size:11.5px}
+.rtext{color:var(--body);font-size:12px;overflow-wrap:anywhere}
+.rmeta{color:var(--faint);font-size:11px;margin-top:3px}
+.rcost{color:var(--muted);font-size:11.5px;font-variant-numeric:tabular-nums;
+  white-space:nowrap;text-align:right}
+
+/* action is state: it gets a shape, not just a word */
+.pill{display:inline-block;font-size:10px;font-weight:600;letter-spacing:.06em;
+  text-transform:uppercase;padding:2px 7px;border-radius:3px;white-space:nowrap}
+.a-pass{background:var(--pass-bg);color:var(--pass)}
+.a-annotate,.a-redact_span{background:var(--accent-soft);color:var(--accent)}
+.a-regenerate,.a-escalate{background:var(--soft-bg);color:var(--soft)}
+.a-block{background:var(--hard-bg);color:var(--hard)}
+.cat{display:inline-block;font-size:10px;color:var(--muted);border:1px solid var(--rule-strong);
+  border-radius:3px;padding:1px 5px;margin-right:4px}
+
+.empty{padding:30px 14px;text-align:center;color:var(--faint);font-size:12px}
+footer{margin-top:26px;padding-top:14px;border-top:1px solid var(--rule);
+  color:var(--faint);font-size:11.5px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>ControlPlane</h1>
+  <div class="live"><span class="dot" id="dot"></span><span id="conn">connecting</span></div>
+  <div class="sp" id="uptime"></div>
+</header>
+
+<div class="tabs" id="tabs" role="tablist"></div>
+<div class="tiles" id="tiles"></div>
+
+<div class="cols">
+  <div>
+    <h2>Decisions <span class="c" id="feedcount"></span></h2>
+    <div class="panel"><div class="scroll" id="feed">
+      <div class="empty">Waiting for traffic. Run <code>python3 demo/feed_dashboard.py</code></div>
+    </div></div>
+  </div>
+  <div>
+    <h2>Review queue <span class="c">escalated and blocked</span></h2>
+    <div class="panel"><div class="scroll" id="queue">
+      <div class="empty">Nothing waiting</div>
+    </div></div>
+  </div>
+</div>
+
+<footer id="foot">Verification cost is metered per check. Every decision here is also in the hash-chained audit log.</footer>
+</div>
+
+<script>
+const state = {tab:"all", snap:{use_cases:{}}, feed:[], queue:[]};
+const $ = id => document.getElementById(id);
+const money = n => n < 0.01 ? (n*100).toFixed(3)+"p" : "Rs "+n.toFixed(3);
+const pct = n => (n*100).toFixed(1)+"%";
+
+function tabs(){
+  const names = ["all", ...Object.keys(state.snap.use_cases).sort()];
+  $("tabs").innerHTML = names.map(n =>
+    `<button class="tab" role="tab" data-t="${n}" aria-selected="${state.tab===n}">${
+      n==="all" ? "All use cases" : n.replace(/_/g," ")}</button>`).join("");
+  $("tabs").querySelectorAll(".tab").forEach(b =>
+    b.onclick = () => { state.tab = b.dataset.t; render(); });
+}
+
+function agg(){
+  const ucs = state.snap.use_cases || {};
+  if (state.tab !== "all") return ucs[state.tab] || null;
+  const out = {n:0, verify_inr:0, llm_inr:0, tier2:0, esc:0, p95:0, over:false};
+  for (const u of Object.values(ucs)){
+    out.n += u.n; out.verify_inr += u.verify_inr; out.llm_inr += u.llm_inr;
+    out.tier2 += u.tier2_rate*u.n; out.esc += u.escalation_rate*u.n;
+    out.p95 = Math.max(out.p95, u.p95_ms); out.over = out.over || u.over_budget;
+  }
+  if (!out.n) return null;
+  return {n:out.n, verify_inr:out.verify_inr, llm_inr:out.llm_inr,
+    tier2_rate:out.tier2/out.n, escalation_rate:out.esc/out.n,
+    max_escalation_rate:null, p95_ms:out.p95, latency_budget_ms:null,
+    over_budget:out.over,
+    verify_pct_of_llm: out.llm_inr ? 100*out.verify_inr/out.llm_inr : 0};
+}
+
+function tile(k,v,s,opts={}){
+  const m = opts.meter;
+  return `<div class="tile ${opts.alert?"alert":""}">
+    <div class="k">${k}</div><div class="v">${v}</div>
+    <div class="s">${s||""}</div>
+    ${m ? `<div class="meter"><i class="${m.over?"over":""}" style="width:${Math.min(100,m.pct)}%"></i></div>` : ""}
+  </div>`;
+}
+
+function tiles(){
+  const a = agg();
+  if (!a){ $("tiles").innerHTML = ""; return; }
+  const escCap = a.max_escalation_rate;
+  const overEsc = escCap != null && a.escalation_rate > escCap;
+  const budget = a.latency_budget_ms;
+  $("tiles").innerHTML = [
+    tile("Verified", a.n.toLocaleString(), "responses this session"),
+    tile("Escalation rate", pct(a.escalation_rate),
+      escCap != null ? `cap ${pct(escCap)}` : "sent to a human",
+      {alert:overEsc, meter: escCap != null ? {pct:100*a.escalation_rate/escCap, over:overEsc} : null}),
+    tile("Tier 2 rate", pct(a.tier2_rate), "reached the judge"),
+    tile("p95 latency", a.p95_ms.toFixed(0)+" ms",
+      budget ? `budget ${budget} ms` : "added by verification",
+      {alert:a.over_budget, meter: budget ? {pct:100*a.p95_ms/budget, over:a.over_budget} : null}),
+    tile("Verification spend", money(a.verify_inr),
+      a.verify_pct_of_llm ? a.verify_pct_of_llm.toFixed(2)+"% of model spend" : ""),
+    tile("Model spend", money(a.llm_inr), "the responses being checked"),
+  ].join("");
+}
+
+function rowHTML(r, isNew){
+  const cats = r.categories.length
+    ? r.categories.map(c=>`<span class="cat">${c}</span>`).join("") : "";
+  return `<div class="row ${isNew?"new":""}">
+    <span class="pill a-${r.action}">${r.action.replace("_"," ")}</span>
+    <div>
+      <div class="rtext">${cats}${(r.spans[0]?.detail || r.reason || "clean")
+        .replace(/[<>&]/g, c=>({"<":"&lt;",">":"&gt;","&":"&amp;"}[c]))}</div>
+      <div class="rmeta">${r.use_case.replace(/_/g," ")} · ${r.request_id} · tiers ${r.tiers_run.join("+")||"-"} · ${r.latency_ms} ms</div>
+    </div>
+    <div class="rcost">${money(r.verification_cost_inr)}</div>
+  </div>`;
+}
+
+function lists(){
+  const keep = r => state.tab === "all" || r.use_case === state.tab;
+  const feed = state.feed.filter(keep).slice(0,120);
+  const queue = state.queue.filter(keep).slice(0,40);
+  $("feedcount").textContent = feed.length ? `${feed.length} shown` : "";
+  $("feed").innerHTML = feed.length
+    ? feed.map((r,i)=>rowHTML(r, i===0 && r._new)).join("")
+    : `<div class="empty">No decisions yet for this use case</div>`;
+  $("queue").innerHTML = queue.length
+    ? queue.map(r=>rowHTML(r,false)).join("")
+    : `<div class="empty">Nothing waiting</div>`;
+  state.feed.forEach(r=>r._new=false);
+}
+
+function render(){ tabs(); tiles(); lists();
+  const u = state.snap.uptime_s;
+  $("uptime").textContent = u ? `up ${u<60 ? u.toFixed(0)+"s" : (u/60).toFixed(1)+"m"}` : "";
+}
+
+async function poll(){
+  try{
+    const r = await fetch("dashboard/stats");
+    const j = await r.json();
+    state.snap = j.snapshot; state.queue = j.queue;
+    if (!state.feed.length) state.feed = j.recent || [];
+    render();
+  }catch(e){ /* the SSE indicator already tells the operator */ }
+}
+
+function connect(){
+  const es = new EventSource("dashboard/events");
+  es.onopen = () => { $("dot").classList.add("on"); $("conn").textContent = "live"; };
+  es.onerror = () => { $("dot").classList.remove("on"); $("conn").textContent = "reconnecting"; };
+  es.onmessage = ev => {
+    const row = JSON.parse(ev.data);
+    row._new = true;
+    state.feed.unshift(row);
+    if (state.feed.length > 250) state.feed.pop();
+    if (row.action === "escalate" || row.action === "block") state.queue.unshift(row);
+    lists();
+  };
+}
+
+poll(); connect(); setInterval(poll, 2000);
+</script>
+</body>
+</html>

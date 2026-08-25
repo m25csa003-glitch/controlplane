@@ -11,10 +11,14 @@ from .schema import RequestContext, Category, Signal
 
 
 class ControlPlane:
-    def __init__(self, audit_path="audit.jsonl", meter=None):
+    def __init__(self, audit_path="audit.jsonl", meter=None, listener=None):
         self.policies = load_all()
         self.audit = AuditLog(audit_path)
         self.meter = meter or CostMeter()
+        # Anything that wants to watch decisions go by - the dashboard, in
+        # practice. Kept off the return path so a slow listener cannot become a
+        # slow request.
+        self.listener = listener
 
     def verify(self, text, use_case, retrieved_chunks=None, allowed_chunk_ids=None,
                user_id="anon", llm_cost_inr=0.0, expects_json=False, usage=None,
@@ -68,6 +72,8 @@ class ControlPlane:
         verdict = decide(ctx, policy, signals, tiers_run, latency,
                          breakdown.verification_inr, llm_cost, breakdown.to_record())
         self.audit.append(verdict.to_record(), policy_version=policy.version)
+        if self.listener is not None:
+            self.listener(verdict)
         return verdict
 
     def _llm_cost(self, usage, model, provider, breakdown, fallback):

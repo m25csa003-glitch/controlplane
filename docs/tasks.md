@@ -20,7 +20,8 @@ Round 2 implementation was carried out by Akshat Jain.
 | Streaming | verification beside the token stream | `demo/run_streaming.py` |
 | Feedback loop | reviews retune thresholds | `demo/run_feedback.py` |
 | Evaluation | 319 labelled cases, 4 configs, 2 sweeps | `eval/results/report.md` |
-| Tests | 28, hermetic, no network | `pytest tests/` |
+| Dashboard | live SSE feed, queue, cost, limits | `dashboard/index.html` |
+| Tests | 33, hermetic, no network | `pytest tests/` |
 
 ## Known gaps, measured rather than hidden
 
@@ -31,6 +32,10 @@ Round 2 implementation was carried out by Akshat Jain.
   opposite meaning; the NLI model often misses it.
 - **`internal_copilot` is over its own latency budget**, 1187ms p95 against
   1000ms. Its uncertainty band is wide, so more responses reach the 1.3s judge.
+- **`customer_support` runs over both its limits under live traffic** — 340ms
+  p95 against a 300ms budget, and an escalation rate far above its 5% cap. The
+  dashboard shows both in red. The cap is the more interesting of the two: it
+  says this policy is written for cleaner traffic than it is being given.
 - **`decision_support` escalates 32.3% against its declared 20% cap.** Surfaced
   by the feedback loop. Needs either reviewers or accepted risk.
 - **Anthropic modelled cost is an estimate.** No Anthropic key was available to
@@ -46,11 +51,11 @@ multi-turn risk accumulation.
 
 ## Remaining before submission
 
-- [ ] Business proposal document
-- [ ] README rewrite
-- [ ] Public GitHub repository
-- [ ] Demo video
-- [ ] Operator dashboard
+- [x] Business proposal document — `docs/proposal.md`
+- [x] README rewrite
+- [x] Operator dashboard
+- [x] Public GitHub repository
+- [ ] Demo video — script ready in `docs/demo_video.md`
 
 ## Rules that still hold
 

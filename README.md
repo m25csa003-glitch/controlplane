@@ -29,8 +29,9 @@ Other entry points:
 
     python3 demo/run_streaming.py --models  # verification beside the token stream
     python3 demo/run_feedback.py            # reviews retuning thresholds
+    uvicorn controlplane.proxy.gateway:app  # gateway + dashboard
     python3 eval/run_eval.py                # the full benchmark, ~45 min with a key
-    pytest tests/                           # 28 tests, no network
+    pytest tests/                           # 33 tests, no network
 
 ## What it does
 
@@ -96,18 +97,29 @@ uncertainty band, thresholds, actions, retention and jurisdiction all live in
     controlplane/feedback/    reviews retuning thresholds
     controlplane/audit/       hash-chained decision log
     controlplane/proxy/       OpenAI-compatible gateway
+    controlplane/telemetry.py in-memory view for the dashboard
+    dashboard/index.html      operator UI, one file, no build step
     eval/                     benchmark harness, dataset and results
     demo/                     runnable scenarios
     docs/                     assumptions, status, running
 
-## Gateway
+## Gateway and dashboard
 
-    uvicorn controlplane.proxy.gateway:app --reload --port 8000
-    curl localhost:8000/health
+    uvicorn controlplane.proxy.gateway:app --port 8000     # loads tier 1 on startup
+    python3 demo/feed_dashboard.py                         # in another terminal
+    open http://localhost:8000/dashboard
 
 OpenAI-compatible, so an existing client points at it by changing a base URL.
-Streaming works; verification runs beside the stream rather than after it. See
-`docs/running.md`.
+Streaming works; verification runs beside the stream rather than after it.
+
+The dashboard is one HTML file served by FastAPI with a live SSE feed — no
+build step, no node. It shows the decision feed, the review queue, the running
+cost meter, and each use case measured against **its own** declared limits:
+escalation rate against the policy's cap, p95 latency against the policy's
+budget. Both go red when exceeded, which is how the over-budget finding in
+`docs/tasks.md` surfaced in the first place.
+
+See `docs/running.md`.
 
 ## Honest notes
 
