@@ -120,7 +120,8 @@ escalation rate against the policy's cap, p95 latency against the policy's
 budget. Both go red when exceeded, which is how the over-budget finding in
 `docs/tasks.md` surfaced in the first place.
 
-See `docs/running.md`.
+See `docs/commands.md` for every command and what it costs, and
+`docs/running.md` for how the gateway works.
 
 ## Honest notes
 
