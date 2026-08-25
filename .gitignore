@@ -16,3 +16,6 @@ dashboard/dist/
 # in the diff.
 demo/audit*.jsonl
 demo/feedback.jsonl
+
+# Gateway run artefact.
+audit.jsonl
