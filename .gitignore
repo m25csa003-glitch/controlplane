@@ -11,3 +11,8 @@ eval/results/audit_*.jsonl
 dashboard/node_modules/
 dashboard/dist/
 .DS_Store
+
+# Demo run artefacts. Regenerated on every run; committing them just makes noise
+# in the diff.
+demo/audit*.jsonl
+demo/feedback.jsonl
