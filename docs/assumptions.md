@@ -38,8 +38,46 @@ statement. Anything here is a design decision we made, not a measured fact.
   for audit trail requirements. Policy is data-driven so a new jurisdiction is a config change,
   not a code change.
 
+## Numbers we assumed rather than measured
+
+- **Rs 88 to the US dollar.** Not a live rate. Every rupee figure moves with it.
+- **Cost of being wrong: Rs 400 / Rs 60 / Rs 50,000** per use case, and **Rs 25
+  / Rs 25 / Rs 200** for a human review. These drive every routing decision and
+  none of them came from a customer. They are the first thing a real deployment
+  would replace, and the whole router is built so that replacing them is a
+  config edit.
+- **Rs 45 per hour** for the GPU tier 1 runs on.
+- **820 prompt tokens and 95 completion tokens** for a typical upstream
+  response, used so verification cost has something to be a percentage of.
+- **Anthropic judge output tokens.** No Anthropic key was available, so the
+  per-claim output figure is an estimate at the pessimistic end. OpenAI's is
+  measured. Anything derived from the Anthropic figure is labelled estimated.
+
+## Limits of what we built
+
+- **Bias detection is shallow by design.** It fires when a protected attribute
+  appears alongside decision or generalisation language. It will miss bias
+  expressed without either, and it cannot detect disparate impact across a
+  population - that needs counterfactual probing, which Round 2 puts out of
+  scope. It catches the shape that matters most in a claims or credit answer:
+  a decision justified by group membership.
+- **Grounding is entailment, not verification.** The model judges whether the
+  retrieved text supports the claim. If retrieval returned the wrong chunk, or
+  a stale one, a confidently wrong answer can still be scored as grounded. We
+  check the answer against the sources, not the sources against the world.
+- **Multi-hop claims are the known weak point**, 4 of 9 on the eval set.
+- **The eval set is synthetic and was written by the same person who tuned the
+  checker.** An earlier version of it scored 100% on every case type, which is
+  why the adversarial cases exist. It is a floor on difficulty, not a ceiling
+  on quality.
+- **The simulated reviewer in the feedback demo is always right.** A real review
+  queue disagrees with itself, and that noise is not modelled.
+
 ## What we are not doing
 
 - No multi-tenant auth, billing, or RBAC.
 - No model fine-tuning from scratch. Tier 1 classifiers are off-the-shelf or lightly adapted.
-- No support for every provider. One provider path is implemented properly.
+- No support for every provider. Two provider paths are implemented; OpenAI is
+  the one verified against a live key.
+- No multi-turn risk accumulation. The brief names it; we verify one response at
+  a time and say so.
