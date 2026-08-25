@@ -148,7 +148,7 @@ def test_offline_judge_accepts_a_restatement():
 def test_verification_cost_excludes_the_upstream_call(cp):
     v = verify(cp, "Room rent capping is 2 percent per day.",
                usage={"prompt_tokens": 800, "completion_tokens": 100},
-               model="claude-sonnet-5")
+               model="gpt-5.6-terra", provider="openai")
     assert v.llm_cost_inr > 0
     labels = [l["label"] for l in v.cost_detail["lines"]]
     assert "llm_response" in labels

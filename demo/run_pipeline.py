@@ -4,6 +4,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from controlplane.pipeline import ControlPlane
+from controlplane.cost.meter import DEMO_UPSTREAM
 from controlplane.tiers import tier1_classifiers
 
 CHUNKS = [
@@ -13,6 +14,7 @@ CHUNKS = [
 
 # Illustrative upstream usage, so the cost meter has something real to price.
 USAGE = {"prompt_tokens": 820, "completion_tokens": 95}
+UPSTREAM_MODEL, UPSTREAM_PROVIDER = DEMO_UPSTREAM
 
 CASES = [
     ("grounded answer",
@@ -42,7 +44,12 @@ def main():
         tier1_classifiers.load_models()
 
     cp = ControlPlane(audit_path="demo/audit.jsonl")
-    judge = "api" if os.getenv("ANTHROPIC_API_KEY") else "offline (no ANTHROPIC_API_KEY)"
+    # Ask the judge which provider it will actually use, rather than checking
+    # one env var and reporting the wrong thing when the other one is set.
+    from controlplane.tiers import tier2_judge
+    provider = tier2_judge._provider()
+    judge = f"{provider} ({tier2_judge._model_for(cp.policies['customer_support'].tiers['tier2'], provider)})" \
+        if provider and tier2_judge._api_key(provider) else "offline (no API key set)"
     print(f"tier 1: {tier1_classifiers.describe()}\njudge:  {judge}")
 
     for use_case in ["customer_support", "internal_copilot", "decision_support"]:
@@ -51,7 +58,7 @@ def main():
               f"wrong={policy.costs['cost_of_being_wrong']} review={policy.costs['cost_of_human_review']}) ===")
         for name, text, chunks, allowed in CASES:
             v = cp.verify(text, use_case, retrieved_chunks=chunks, allowed_chunk_ids=allowed,
-                          usage=USAGE, model="claude-sonnet-5", provider="anthropic")
+                          usage=USAGE, model=UPSTREAM_MODEL, provider=UPSTREAM_PROVIDER)
             cats = ",".join(sorted({t["category"] for t in v.triggered})) or "-"
             print(f"  {name:22s} -> {v.action.value:12s} tiers={str(v.tiers_run):9s} "
                   f"[{cats:22s}] verify={v.verification_cost_inr * 100:.4f}p "

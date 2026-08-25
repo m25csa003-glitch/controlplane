@@ -7,6 +7,11 @@ import yaml
 
 PRICING_PATH = Path(__file__).resolve().parents[2] / "configs" / "pricing.yaml"
 
+# What the demos assume the application itself is running on. ControlPlane does
+# not care - it prices whatever the caller reports - but the demo has to pick
+# something, and picking it in one place stops three files disagreeing.
+DEMO_UPSTREAM = (os.getenv("CP_DEMO_UPSTREAM_MODEL", "gpt-5.6-terra"), "openai")
+
 
 @dataclass
 class CostLine:

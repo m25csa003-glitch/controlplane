@@ -49,6 +49,11 @@ statement. Anything here is a design decision we made, not a measured fact.
 - **Rs 45 per hour** for the GPU tier 1 runs on.
 - **820 prompt tokens and 95 completion tokens** for a typical upstream
   response, used so verification cost has something to be a percentage of.
+- **The application runs `gpt-5.6-terra`.** ControlPlane does not care what the
+  application runs - it prices whatever the caller reports - but the demos have
+  to assume something, and that assumption is the denominator of every
+  "verification is X% of model spend" figure. One env var,
+  `CP_DEMO_UPSTREAM_MODEL`, changes it everywhere.
 - **Anthropic judge output tokens.** No Anthropic key was available, so the
   per-claim output figure is an estimate at the pessimistic end. OpenAI's is
   measured. Anything derived from the Anthropic figure is labelled estimated.

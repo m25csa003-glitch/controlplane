@@ -9,6 +9,7 @@ import httpx
 from fastapi import FastAPI, Request, Header
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 
+from ..cost.meter import DEMO_UPSTREAM
 from ..pipeline import ControlPlane
 from ..tiers import tier1_classifiers
 from ..streaming import StreamingVerifier
@@ -123,8 +124,8 @@ async def chat_completions(
         retrieved_chunks=extras.get("retrieved_chunks"),
         allowed_chunk_ids=set(extras["allowed_chunk_ids"]) if extras.get("allowed_chunk_ids") else None,
         user_id=extras.get("user_id", "anon"),
-        usage=usage, model=extras.get("price_as", "claude-sonnet-5"),
-        provider=extras.get("price_provider", "anthropic"),
+        usage=usage, model=extras.get("price_as", DEMO_UPSTREAM[0]),
+        provider=extras.get("price_provider", DEMO_UPSTREAM[1]),
     )
 
     delivered = _apply_action(text, verdict)

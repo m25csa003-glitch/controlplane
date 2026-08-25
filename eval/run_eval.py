@@ -21,6 +21,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from controlplane.pipeline import ControlPlane
+from controlplane.cost.meter import DEMO_UPSTREAM
 from controlplane.policy.loader import Policy
 from controlplane.tiers import tier1_classifiers, tier2_judge
 from eval.metrics import summarize, per_category, per_kind
@@ -32,7 +33,7 @@ RESULTS = ROOT / "eval" / "results"
 # Illustrative upstream usage per response, so verification cost has something
 # to be a percentage of. Stated in docs/assumptions.md.
 USAGE = {"prompt_tokens": 820, "completion_tokens": 95}
-UPSTREAM_MODEL = "claude-sonnet-5"
+UPSTREAM_MODEL, UPSTREAM_PROVIDER = DEMO_UPSTREAM
 
 
 def disable(raw, *tiers):
@@ -164,7 +165,10 @@ def write_report(results, sweep_rows, band_rows, cases, meta):
     L.append(f"Generated {meta['generated']}  \n")
     L.append(f"Dataset: `{DATASET.name}`, {len(cases)} cases  \n")
     L.append(f"Tier 1 grounding mode: **{meta['tier1_mode']}**  \n")
-    L.append(f"Tier 2 judge: **{meta['judge_mode']}**\n")
+    L.append(f"Tier 2 judge: **{meta['judge_mode']}**  \n")
+    L.append(f"Upstream priced as: **{UPSTREAM_MODEL}** — the cost column is a "
+             f"percentage of this, so it moves if the application runs a "
+             f"different model.\n")
     L.append("\n> Every case is synthetic and labelled by construction. "
              "Numbers describe this set only.\n")
 
