@@ -74,7 +74,13 @@ header .sp{margin-left:auto;color:var(--faint);font-size:11.5px}
   gap:10px;margin-bottom:22px}
 .tile{background:var(--surface);border:1px solid var(--rule);border-radius:5px;padding:13px 15px}
 .tile .k{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--faint);
-  margin-bottom:7px}
+  margin-bottom:7px;display:flex;gap:6px;align-items:center}
+/* A number without provenance is a liability. Spend that left an account and
+   spend that was modelled are not the same claim and must not look alike. */
+.tag{font-size:9px;white-space:nowrap;letter-spacing:.06em;padding:1px 5px;border-radius:3px;
+  text-transform:uppercase;font-weight:600}
+.tag.billed{background:var(--pass-bg);color:var(--pass)}
+.tag.notbilled{background:var(--soft-bg);color:var(--soft)}
 .tile .v{font-family:Archivo,system-ui,sans-serif;font-size:25px;font-weight:600;
   color:var(--ink);font-variant-numeric:tabular-nums;line-height:1.1}
 .tile .s{font-size:11.5px;color:var(--muted);margin-top:4px}
@@ -191,16 +197,19 @@ function tabs(){
 function agg(){
   const ucs = state.snap.use_cases || {};
   if (state.tab !== "all") return ucs[state.tab] || null;
-  const out = {n:0, verify_inr:0, llm_inr:0, review_inr:0, tier2:0, esc:0, p95:0, over:false};
+  const out = {n:0, verify_inr:0, llm_inr:0, review_inr:0, billed_inr:0,
+               modelled_inr:0, tier2:0, esc:0, p95:0, over:false};
   for (const u of Object.values(ucs)){
     out.n += u.n; out.verify_inr += u.verify_inr; out.llm_inr += u.llm_inr;
     out.review_inr += u.review_inr || 0;
+    out.billed_inr += u.billed_inr || 0; out.modelled_inr += u.modelled_inr || 0;
     out.tier2 += u.tier2_rate*u.n; out.esc += u.escalation_rate*u.n;
     out.p95 = Math.max(out.p95, u.p95_ms); out.over = out.over || u.over_budget;
   }
   if (!out.n) return null;
   return {n:out.n, verify_inr:out.verify_inr, llm_inr:out.llm_inr,
-    review_inr:out.review_inr,
+    review_inr:out.review_inr, billed_inr:out.billed_inr,
+    modelled_inr:out.modelled_inr,
     tier2_rate:out.tier2/out.n, escalation_rate:out.esc/out.n,
     max_escalation_rate:null, p95_ms:out.p95, latency_budget_ms:null,
     over_budget:out.over,
@@ -220,8 +229,13 @@ function funnel(){
 
 function tile(k,v,s,opts={}){
   const m = opts.meter;
+  // The one question a money tile has to answer on sight: did this leave an
+  // account, or is it a figure we worked out? Someone who built this system
+  // read a modelled review cost as their own API bill.
+  const tag = opts.tag
+    ? `<span class="tag ${opts.tag==="billed"?"billed":"notbilled"}">${opts.tag}</span>` : "";
   return `<div class="tile ${opts.alert?"alert":""}">
-    <div class="k">${k}</div><div class="v">${v}</div>
+    <div class="k">${k}${tag}</div><div class="v">${v}</div>
     <div class="s">${s||""}</div>
     ${m ? `<div class="meter"><i class="${m.over?"over":""}" style="width:${Math.min(100,m.pct)}%"></i></div>` : ""}
   </div>`;
@@ -245,11 +259,14 @@ function tiles(){
         : budget ? `inside the ${budget} ms budget` : "added by verification",
       {alert:a.over_budget, meter: budget ? {pct:100*a.p95_ms/budget, over:a.over_budget} : null}),
     tile("Verification spend", money(a.verify_inr),
-      a.verify_pct_of_llm ? a.verify_pct_of_llm.toFixed(2)+"% of the model spend it checked" : ""),
-    tile("Review queue cost", money(a.review_inr || 0),
-      a.review_inr && a.verify_inr
-        ? Math.round(a.review_inr/a.verify_inr).toLocaleString()+"x what checking cost"
-        : "human time this session"),
+      (a.billed_inr ? `${money(a.billed_inr)} charged by a provider, rest is compute time`
+                    : "compute time, nothing charged to a provider"),
+      {tag: a.billed_inr ? "billed" : "not billed"}),
+    tile("Review labour", money(a.review_inr || 0),
+      a.review_inr
+        ? `what a person would cost reviewing each escalation \u00b7 ${Math.round(a.review_inr/Math.max(a.verify_inr,1e-9)).toLocaleString()}x the checking`
+        : "nothing has been sent for review yet",
+      {tag: "not billed"}),
   ].join("");
 }
 

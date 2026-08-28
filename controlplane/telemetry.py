@@ -58,7 +58,8 @@ class Telemetry:
     def _tally(self, verdict, row):
         t = self.totals.setdefault(verdict.use_case, {
             "n": 0, "actions": {}, "categories": {}, "tier2": 0,
-            "verify_inr": 0.0, "llm_inr": 0.0, "latency": deque(maxlen=250),
+            "verify_inr": 0.0, "llm_inr": 0.0, "billed_inr": 0.0,
+            "modelled_inr": 0.0, "latency": deque(maxlen=250),
         })
         t["n"] += 1
         t["actions"][row["action"]] = t["actions"].get(row["action"], 0) + 1
@@ -69,6 +70,17 @@ class Telemetry:
         t["verify_inr"] += verdict.verification_cost_inr
         t["llm_inr"] += verdict.llm_cost_inr
         t["latency"].append(verdict.latency_ms)
+
+        # Money actually spent with a provider, kept apart from money the meter
+        # modelled. Both are real information; presenting them as one number is
+        # how a reader ends up thinking a modelled figure left their account.
+        for line in (verdict.cost_detail or {}).get("lines", []):
+            if line["label"] == "llm_response":
+                continue
+            if line.get("method") in ("reported", "counted"):
+                t["billed_inr"] += line["inr"]
+            else:
+                t["modelled_inr"] += line["inr"]
 
     # --- read -----------------------------------------------------------
 
@@ -95,6 +107,8 @@ class Telemetry:
                 "max_escalation_rate": (
                     policy.tiers.get("tier2", {}).get("max_escalation_rate") if policy else None),
                 "verify_inr": round(t["verify_inr"], 4),
+                "billed_inr": round(t["billed_inr"], 4),
+                "modelled_inr": round(t["modelled_inr"], 4),
                 "llm_inr": round(t["llm_inr"], 4),
                 "verify_pct_of_llm": (100 * t["verify_inr"] / t["llm_inr"]) if t["llm_inr"] else 0,
                 "p50_ms": _pct(lat, 50),
