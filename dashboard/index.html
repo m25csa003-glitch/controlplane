@@ -130,41 +130,57 @@ footer{margin-top:26px;padding-top:14px;border-top:1px solid var(--rule);
   color:var(--faint);font-size:11.5px}
 
 /* ---- charts -------------------------------------------------------------
+   Bars are HTML, not SVG. The first version stretched a 0-100 viewBox with
+   preserveAspectRatio="none", which scales x by six and turns every label into
+   spaced-out letterforms and every end-dot into an ellipse. Flexbox gets the
+   same responsive behaviour with text that stays text.
+
    Severity is an ordered scale, not a set of identities, so the stack uses a
-   sequential ramp - light is "we let it through", dark is "we stopped it".
-   The dashboard's own status colours were tried first and the validator
-   rejected them as a categorical set: green and teal sit 6.5 dE apart, red and
-   amber 4.8 under deuteranopia. They stay on the pills, where each sits alone
-   with a text label; adjacent stacked segments need real separation.
-   Each mode's ramp is stepped for its own surface, not flipped. */
+   sequential ramp - light is "we let it through", dark is "we stopped it". The
+   dashboard's own status colours were tried first and the validator rejected
+   them as a categorical set: green and teal 6.5 dE apart on normal vision, red
+   and amber 4.8 under deuteranopia. They stay on the pills, where each sits
+   alone with a text label. Each mode's ramp is stepped for its own surface. */
 .viz{
   --sev-1:#CFE6E8; --sev-2:#8FCBD0; --sev-3:#3D95A0; --sev-4:#0E5A63;
-  --grid:var(--rule); --mark:#0E5A63; --mark-soft:#8FCBD0;
+  --mark:#0E5A63; --track:var(--raised);
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .viz{
   --sev-1:#173F45; --sev-2:#1F6B74; --sev-3:#3AA3AE; --sev-4:#7FD3DA;
-  --mark:#7FD3DA; --mark-soft:#1F6B74;
+  --mark:#7FD3DA;
 }}
 :root[data-theme="dark"] .viz{
   --sev-1:#173F45; --sev-2:#1F6B74; --sev-3:#3AA3AE; --sev-4:#7FD3DA;
-  --mark:#7FD3DA; --mark-soft:#1F6B74;
+  --mark:#7FD3DA;
 }
 .charts{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:22px}
 @media (max-width:900px){.charts{grid-template-columns:1fr}}
 .card{background:var(--surface);border:1px solid var(--rule);border-radius:5px;
-  padding:14px 16px 12px}
+  padding:14px 16px 13px}
 .card h3{font-family:Archivo,system-ui,sans-serif;font-size:12.5px;font-weight:600;
-  color:var(--ink);margin:0 0 2px}
-.card p{margin:0 0 12px;font-size:11px;color:var(--faint);line-height:1.45}
-.card svg{display:block;width:100%;overflow:visible}
-.legend{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:10px;font-size:10.5px;
+  color:var(--ink);margin:0 0 3px}
+.card .cap{margin:0 0 14px;font-size:11px;color:var(--faint);line-height:1.45}
+
+/* one row = label, track, value. The grid keeps the three columns from ever
+   colliding, which the SVG version could not promise. */
+.brow{display:grid;grid-template-columns:var(--lw,104px) 1fr auto;gap:10px;
+  align-items:center;margin-bottom:9px}
+.brow:last-child{margin-bottom:0}
+.blabel{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis}
+.bval{font-size:11px;color:var(--body);font-variant-numeric:tabular-nums;
+  white-space:nowrap;min-width:38px;text-align:right}
+.btrack{height:12px;background:var(--track);border-radius:2px;overflow:hidden;
+  display:flex;gap:2px}                    /* 2px of surface separates segments */
+.btrack i{display:block;height:100%;border-radius:2px;min-width:2px}
+.bfill{height:12px;background:var(--mark);border-radius:2px;min-width:2px}
+
+.legend{display:flex;flex-wrap:wrap;gap:5px 14px;margin-top:12px;font-size:10.5px;
   color:var(--muted)}
 .legend i{display:inline-block;width:9px;height:9px;border-radius:2px;
   margin-right:5px;vertical-align:-1px}
-.vlabel{font-family:"IBM Plex Mono",monospace;font-size:10px;fill:var(--faint)}
-.vval{font-family:"IBM Plex Mono",monospace;font-size:10.5px;fill:var(--body);
-  font-variant-numeric:tabular-nums}
-.vnone{padding:22px 0;text-align:center;color:var(--faint);font-size:11.5px}
+.spark{display:block;width:100%;height:auto}
+.vnone{padding:24px 0;text-align:center;color:var(--faint);font-size:11.5px}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 </style>
 </head>
@@ -338,141 +354,115 @@ function lists(){
 }
 
 // --- charts ---------------------------------------------------------------
-// Severity buckets, ordered by how much the layer intervened. Grouped by what
-// actually reached the caller, not by the action's name: escalate delivers with
-// a flag, regenerate withholds once its budget is spent.
+// Bars are HTML. An SVG with a stretched viewBox scaled x by six and turned
+// every label into spaced-out letterforms; flexbox is responsive without
+// distorting anything drawn inside it.
 const SEVERITY = [
-  {key:"delivered", label:"Delivered",  actions:["pass"],                     v:"--sev-1"},
-  {key:"flagged",   label:"Flagged",    actions:["annotate","escalate"],      v:"--sev-2"},
-  {key:"edited",    label:"Edited",     actions:["redact_span"],              v:"--sev-3"},
-  {key:"withheld",  label:"Withheld",   actions:["block","regenerate"],       v:"--sev-4"},
+  {label:"Delivered", actions:["pass"],                v:"--sev-1"},
+  {label:"Flagged",   actions:["annotate","escalate"], v:"--sev-2"},
+  {label:"Edited",    actions:["redact_span"],         v:"--sev-3"},
+  {label:"Withheld",  actions:["block","regenerate"],  v:"--sev-4"},
 ];
 const esc = s => String(s).replace(/[<>&"]/g, c=>({"<":"&lt;",">":"&gt;","&":"&amp;",'"':"&quot;"}[c]));
+const card = (title, cap, body, legend) =>
+  `<div class="card"><h3>${title}</h3><p class="cap">${cap}</p>${body}
+   ${legend?`<div class="legend">${legend}</div>`:""}</div>`;
+const brow = (label, track, value, lw) =>
+  `<div class="brow"${lw?` style="--lw:${lw}"`:""}>
+     <span class="blabel">${label}</span>${track}<span class="bval">${value}</span></div>`;
 
-function severityOf(actions){
-  return SEVERITY.map(s => ({...s, n: s.actions.reduce((a,k)=>a+(actions[k]||0),0)}));
+function scopeUseCases(){
+  const ucs = state.snap.use_cases || {};
+  return state.tab === "all"
+    ? Object.keys(ucs).sort().map(n=>({name:n, ...ucs[n]}))
+    : (ucs[state.tab] ? [{name:state.tab, ...ucs[state.tab]}] : []);
 }
 
-// Stacked horizontal bar. 2px surface gaps do the separating - no strokes.
 function chartActions(){
-  const ucs = state.snap.use_cases || {};
-  const rows = (state.tab === "all" ? Object.keys(ucs).sort() : [state.tab])
-    .filter(n => ucs[n]).map(n => ({name:n, ...ucs[n]}));
+  const rows = scopeUseCases();
   if (!rows.length) return "";
-
-  const H = 26, GAP = 12, W = 100;
-  const body = rows.map((r,i) => {
-    const y = i*(H+GAP), segs = severityOf(r.actions), tot = r.n || 1;
-    let x = 0;
-    const bars = segs.filter(s=>s.n).map(s => {
-      const w = 100*s.n/tot, x0 = x; x += w;
-      // 2px of surface between segments, taken from the segment's own width
-      return `<rect x="${x0}%" y="${y+13}" width="${w}%" height="${H-13}"
-        fill="var(${s.v})" rx="2"><title>${esc(s.label)}: ${s.n} of ${r.n}</title></rect>
-        <rect x="${x0}%" y="${y+13}" width="2" height="${H-13}" fill="var(--surface)"/>`;
-    }).join("");
-    const worst = segs.filter(s=>s.n).pop();
-    return `<text class="vlabel" x="0" y="${y+8}">${esc(r.name.replace(/_/g," "))}</text>
-      <text class="vval" x="100%" y="${y+8}" text-anchor="end">${r.n}</text>${bars}`;
+  const body = rows.map(r => {
+    const tot = r.n || 1;
+    const segs = SEVERITY.map(s => ({...s, n: s.actions.reduce((a,k)=>a+((r.actions||{})[k]||0),0)}))
+                         .filter(s => s.n);
+    const track = `<div class="btrack">` + segs.map(s =>
+      `<i style="width:${(100*s.n/tot).toFixed(2)}%;background:var(${s.v})"
+          title="${esc(s.label)}: ${s.n} of ${r.n}"></i>`).join("") + `</div>`;
+    return brow(esc(r.name.replace(/_/g," ")), track, r.n);
   }).join("");
-
   return card("What happened to each response",
     "Grouped by what reached the caller. Darker is more intervention.",
-    `<svg viewBox="0 0 ${W} ${rows.length*(H+GAP)}" preserveAspectRatio="none"
-        height="${rows.length*(H+GAP)}" role="img"
-        aria-label="Share of responses by how much the layer intervened">${body}</svg>`,
+    body,
     SEVERITY.map(s=>`<span><i style="background:var(${s.v})"></i>${s.label}</span>`).join(""));
 }
 
-// Single series, so one hue and no legend - the title names it.
+// Single series: one hue, no legend box - the title already names it.
 function chartCategories(){
-  const ucs = state.snap.use_cases || {};
-  const src = state.tab === "all" ? Object.values(ucs) : [ucs[state.tab]].filter(Boolean);
   const tally = {};
-  for (const u of src) for (const [k,v] of Object.entries(u.categories||{})) tally[k]=(tally[k]||0)+v;
+  for (const u of scopeUseCases())
+    for (const [k,v] of Object.entries(u.categories||{})) tally[k]=(tally[k]||0)+v;
   const rows = Object.entries(tally).sort((a,b)=>b[1]-a[1]);
-  if (!rows.length) return card("Which checks fired","Nothing has tripped yet.",
-    `<div class="vnone">No findings</div>`);
-
-  const max = rows[0][1], H = 18, GAP = 8;
-  const body = rows.map(([k,v],i)=>{
-    const y=i*(H+GAP);
-    return `<text class="vlabel" x="0" y="${y+12}">${esc(k)}</text>
-      <rect x="86" y="${y+3}" width="${Math.max(1, 74*v/max)}%" height="${H-6}"
-        fill="var(--mark)" rx="2"><title>${esc(k)}: ${v}</title></rect>
-      <text class="vval" x="100%" y="${y+12}" text-anchor="end">${v}</text>`;
-  }).join("");
-  return card("Which checks fired", "Findings by category. One response can trip several.",
-    `<svg viewBox="0 0 100 ${rows.length*(H+GAP)}" preserveAspectRatio="none"
-        height="${rows.length*(H+GAP)}" role="img"
-        aria-label="Findings by risk category">${body}</svg>`);
+  if (!rows.length) return card("Which checks fired",
+    "Findings by category.", `<div class="vnone">Nothing has tripped yet</div>`);
+  const max = rows[0][1];
+  const body = rows.map(([k,v]) =>
+    brow(esc(k), `<div class="bfill" style="width:${(100*v/max).toFixed(1)}%"
+      title="${esc(k)}: ${v}"></div>`, v, "84px")).join("");
+  return card("Which checks fired",
+    "Findings by category. One response can trip several.", body);
 }
 
-// Trend against a limit. The budget is the reason to look, so it is drawn.
+function chartTier2Cost(){
+  const a = agg();
+  const src = scopeUseCases();
+  if (!a || !src.length) return "";
+  const t2 = src.reduce((s,u)=>s+(u.tier2_inr||0),0);
+  const tot = src.reduce((s,u)=>s+(u.verify_inr||0),0);
+  if (!tot) return card("What tier 2 costs",
+    "The judge has not run yet.", `<div class="vnone">No judge calls</div>`);
+  const bars = [
+    {l:"of responses",          p:100*a.tier2_rate},
+    {l:"of the checking spend", p:100*t2/tot},
+  ];
+  const body = bars.map(b => brow(b.l,
+    `<div class="btrack"><i style="width:${Math.min(100,b.p).toFixed(1)}%;
+       background:var(--mark)"></i></div>`, b.p.toFixed(1)+"%", "128px")).join("");
+  return card("What tier 2 costs",
+    "The judge runs on few responses and takes most of the verification spend. That gap is the cascade.",
+    body);
+}
+
+// The one place SVG is right - and it keeps a real aspect ratio, so the stroke
+// stays 2px and the end marker stays round.
 function chartLatency(){
-  const ucs = state.snap.use_cases || {};
   const scope = state.tab === "all" ? null : state.tab;
   const pts = state.feed.filter(r=>!scope||r.use_case===scope).slice(0,60).reverse()
                         .map(r=>r.latency_ms);
-  if (pts.length < 2) return card("Latency, most recent first",
+  if (pts.length < 2) return card("Latency, oldest to newest",
     "Not enough traffic yet.", `<div class="vnone">Waiting</div>`);
 
+  const ucs = state.snap.use_cases || {};
   const budget = scope ? ucs[scope]?.latency_budget_ms : null;
-  const top = Math.max(...pts, budget || 0) * 1.15;
-  const H = 78, w = 100/(pts.length-1);
-  const d = pts.map((v,i)=>`${i?"L":"M"}${(i*w).toFixed(2)} ${(H - H*v/top).toFixed(2)}`).join(" ");
-  const bud = budget ? H - H*budget/top : null;
+  const W = 560, H = 78, PAD = 6;
+  const top = Math.max(...pts, budget || 0) * 1.15 || 1;
+  const X = i => PAD + (W-2*PAD) * i/(pts.length-1);
+  const Y = v => H - PAD - (H-2*PAD) * v/top;
+  const d = pts.map((v,i)=>`${i?"L":"M"}${X(i).toFixed(1)} ${Y(v).toFixed(1)}`).join(" ");
   const last = pts[pts.length-1];
 
   return card("Latency, oldest to newest",
     scope ? `Against the ${budget} ms this policy allows.` : "All use cases together.",
-    `<svg viewBox="0 0 100 ${H}" preserveAspectRatio="none" height="${H}" role="img"
-        aria-label="Verification latency over the most recent responses">
-      ${bud!=null?`<line x1="0" y1="${bud.toFixed(2)}" x2="100" y2="${bud.toFixed(2)}"
-        stroke="var(--grid)" stroke-width="1"/>
-        <text class="vlabel" x="0" y="${Math.max(9,bud-4).toFixed(2)}">budget ${budget} ms</text>`:""}
+    `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet"
+        role="img" aria-label="Verification latency over the most recent responses">
+      ${budget?`<line x1="0" y1="${Y(budget).toFixed(1)}" x2="${W}" y2="${Y(budget).toFixed(1)}"
+        stroke="var(--rule-strong)" stroke-width="1"/>`:""}
       <path d="${d}" fill="none" stroke="var(--mark)" stroke-width="2"
-        stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
-      <circle cx="100" cy="${(H - H*last/top).toFixed(2)}" r="4" fill="var(--mark)"
-        stroke="var(--surface)" stroke-width="2"/>
+        stroke-linejoin="round" stroke-linecap="round"/>
+      <circle cx="${X(pts.length-1).toFixed(1)}" cy="${Y(last).toFixed(1)}" r="4"
+        fill="var(--mark)" stroke="var(--surface)" stroke-width="2"/>
      </svg>
-     <div class="legend"><span>latest ${last.toFixed(0)} ms</span></div>`);
-}
-
-// Emphasis, not categorical: tier 2 is the point, the rest is context.
-function chartTier2Cost(){
-  const a = agg();
-  if (!a || !a.n) return "";
-  const ucs = state.snap.use_cases || {};
-  const src = state.tab === "all" ? Object.values(ucs) : [ucs[state.tab]].filter(Boolean);
-  const t2cost = src.reduce((s,u)=>s+(u.tier2_inr||0),0);
-  const total  = src.reduce((s,u)=>s+(u.verify_inr||0),0);
-  if (!total) return card("What tier 2 costs",
-    "The judge has not run yet, so it has cost nothing.", `<div class="vnone">No judge calls</div>`);
-
-  const bars = [
-    {l:"of responses",       p:100*a.tier2_rate},
-    {l:"of what checking cost", p:100*t2cost/total},
-  ];
-  const H=22, GAP=16;
-  const body = bars.map((b,i)=>{
-    const y=i*(H+GAP);
-    return `<text class="vlabel" x="0" y="${y+9}">${esc(b.l)}</text>
-      <rect x="0" y="${y+13}" width="100%" height="${H-13}" fill="var(--raised)" rx="2"/>
-      <rect x="0" y="${y+13}" width="${Math.min(100,b.p).toFixed(1)}%" height="${H-13}"
-        fill="var(--mark)" rx="2"><title>${b.p.toFixed(1)}%</title></rect>
-      <text class="vval" x="100%" y="${y+9}" text-anchor="end">${b.p.toFixed(1)}%</text>`;
-  }).join("");
-  return card("What tier 2 costs",
-    "The judge runs on few responses and takes most of the verification spend. That gap is the cascade.",
-    `<svg viewBox="0 0 100 ${bars.length*(H+GAP)}" preserveAspectRatio="none"
-        height="${bars.length*(H+GAP)}" role="img"
-        aria-label="Tier 2 share of responses against its share of verification cost">${body}</svg>`);
-}
-
-function card(title, sub, svg, legend){
-  return `<div class="card"><h3>${title}</h3><p>${sub}</p>${svg}
-    ${legend?`<div class="legend">${legend}</div>`:""}</div>`;
+     <div class="legend"><span>latest ${last.toFixed(0)} ms</span>${
+       budget?`<span>budget ${budget} ms</span>`:""}<span>peak ${Math.max(...pts).toFixed(0)} ms</span></div>`);
 }
 
 function charts(){
