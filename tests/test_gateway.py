@@ -107,16 +107,73 @@ async def test_regenerate_retries_and_delivers_the_better_answer():
 
 
 @pytest.mark.asyncio
+async def test_a_buffered_stream_regenerates_too():
+    """Buffered held the bad text back, so there is still something to
+    regenerate into. If only the batch path retried, the same request would
+    return a good answer or a withheld one depending on a flag the caller set
+    for unrelated reasons."""
+    streamed, smeta = await post("customer_support", "room rent", stream=True)
+    batch, bmeta = await post("customer_support", "room rent")
+    assert smeta["regenerations"] == bmeta["regenerations"] >= 1
+    assert "2 percent" not in streamed
+    assert streamed.strip() == batch.strip()
+
+
+@pytest.mark.asyncio
+async def test_streaming_mode_cannot_regenerate_and_does_not_pretend_to():
+    """internal_copilot streams tokens as they arrive, so by the time the
+    verdict exists the answer is on the caller's screen. There is nothing left
+    to replace."""
+    text, meta = await post("internal_copilot", "room rent", stream=True)
+    assert meta["regenerations"] == 0
+    assert meta["applied"] == "advisory"
+
+
+@pytest.mark.asyncio
+async def test_the_retry_tells_the_model_what_was_wrong(monkeypatch):
+    """Re-sending the original request unchanged is not a regeneration - same
+    prompt, same model, most likely the same answer. The retry has to carry the
+    rejection, the unsupported claim and the sources."""
+    seen = []
+    real = gateway._call_upstream
+
+    async def spy(body, extras=None, correction=None):
+        seen.append(correction)
+        return await real(body, extras, correction)
+
+    monkeypatch.setattr(gateway, "_call_upstream", spy)
+    await post("customer_support", "room rent")
+
+    assert seen[0] is None                       # first call is the plain request
+    assert seen[1], "the retry sent no correction"
+    prompt = seen[1][-1]["content"]
+    assert "rejected by a verification layer" in prompt
+    assert "2 percent" in prompt                 # the claim that was rejected
+    assert "1 percent" in prompt                 # what the sources actually say
+
+
+@pytest.mark.asyncio
 async def test_regeneration_budget_is_finite(monkeypatch):
-    """If the model keeps producing the same wrong answer, the loop has to stop
-    and the answer must not be delivered anyway."""
-    monkeypatch.setattr(gateway, "REGENERATED", HALLUCINATION)
+    """A model that will not correct itself must not exhaust the loop, and its
+    answer must not be delivered anyway."""
+    monkeypatch.setattr(gateway, "_mock_reply", lambda p, e=None: HALLUCINATION)
     text, meta = await post("customer_support", "room rent")
     budget = gateway.cp.policies["customer_support"].raw.get("max_regenerations", 1)
     assert meta["regenerations"] == budget
     assert meta["action"] == Action.REGENERATE.value
     assert "2 percent" not in text
     assert "withheld by ControlPlane" in text
+
+
+@pytest.mark.asyncio
+async def test_every_regeneration_is_charged_for(monkeypatch):
+    """A retry is a second model call. Charging only for the last one would make
+    the path that retried most look like the cheapest."""
+    one, _ = await post("customer_support", "cashless")       # no retry
+    monkeypatch.setattr(gateway, "_mock_reply", lambda p, e=None: HALLUCINATION)
+    retried, meta = await post("customer_support", "room rent")
+    assert meta["regenerations"] >= 1
+    assert meta["llm_cost_inr"] > 0
 
 
 # --- the cost column ----------------------------------------------------

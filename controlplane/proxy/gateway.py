@@ -132,15 +132,21 @@ async def chat_completions(
     text, usage = await _call_upstream(body, extras)
     verdict = _verify(text, usage)
 
-    # regenerate means ask the model again, not "deliver it anyway". Without
-    # this the action was a no-op: the router said the answer was wrong and the
-    # gateway handed it over untouched.
+    # regenerate means ask the model again with what was wrong, not "deliver it
+    # anyway". Without this the action was a no-op: the router ruled the answer
+    # wrong and the gateway handed it over untouched.
     attempts = 0
+    upstream_inr = verdict.llm_cost_inr
     budget = policy.raw.get("max_regenerations", 1)
     while verdict.action == Action.REGENERATE and attempts < budget:
         attempts += 1
-        text, usage = await _call_upstream(body, extras, attempt=attempts)
+        text, usage = await _call_upstream(
+            body, extras, correction=_correction_turns(text, verdict, extras))
         verdict = _verify(text, usage)
+        # Each attempt is a real model call. Charging only for the last one
+        # would make the cheapest-looking path the one that retried most.
+        upstream_inr += verdict.llm_cost_inr
+    verdict.llm_cost_inr = upstream_inr
 
     upstream_ms = (time.perf_counter() - upstream_start) * 1000
     delivered = _apply_action(text, verdict)
@@ -192,33 +198,65 @@ def _apply_action(text, verdict):
     return text
 
 
-async def _call_upstream(body, extras=None, attempt=0):
+CORRECTION = """Your previous answer was rejected by a verification layer.
+
+REJECTED ANSWER:
+{answer}
+
+WHY: {reason}
+{claims}
+SOURCES — every claim you make must be supported by these:
+{sources}
+
+Rewrite the answer using only what the sources support. Do not restate the
+rejected claim. If the sources do not answer the question, say so plainly
+rather than filling the gap."""
+
+
+def _correction_turns(text, verdict, extras):
+    """The retry prompt.
+
+    Re-sending the original request unchanged is not a regeneration - same
+    prompt, same model, most likely the same wrong answer. The model is told
+    what was rejected, which spans were unsupported, and what the sources
+    actually say."""
+    flagged = [text[s.span[0]:s.span[1]] for s in verdict.signals
+               if s.span and s.score >= 0.5][:4]
+    claims = ("\nUNSUPPORTED:\n" + "\n".join(f"- {c}" for c in flagged) + "\n") if flagged else ""
+    sources = "\n".join(f"[{c.get('id', i)}] {c.get('text','')}"
+                        for i, c in enumerate(extras.get("retrieved_chunks") or [])) or "(none)"
+    return [
+        {"role": "assistant", "content": text},
+        {"role": "user", "content": CORRECTION.format(
+            answer=text, reason=verdict.reason, claims=claims, sources=sources)},
+    ]
+
+
+async def _call_upstream(body, extras=None, correction=None):
+    """correction is the extra turns a regeneration adds. Passing them is the
+    whole difference between asking again and asking better."""
+    payload = dict(body)
+    if correction:
+        payload["messages"] = list(payload.get("messages", [])) + correction
+
     if UPSTREAM == "mock":
         await asyncio.sleep(0.05)
-        # On a regeneration the mock returns a grounded answer, so the retry
-        # path is visible end to end. A real model has no such guarantee, which
-        # is why max_regenerations is finite and the action falls through to
-        # withholding when the budget runs out.
-        if attempt and not (extras or {}).get("mock_response"):
-            return REGENERATED, {"prompt_tokens": 820, "completion_tokens": 95}
         # A caller replaying a fixture supplies the response it wants checked.
         # Without this the mock answers everything with the same sentence and
         # the dashboard shows one verdict repeated.
         canned = (extras or {}).get("mock_response")
-        if canned:
+        if canned and not correction:
             return canned, {"prompt_tokens": 820, "completion_tokens": 95}
-        msgs = body.get("messages", [])
+        msgs = payload.get("messages", [])
         last = msgs[-1]["content"] if msgs else ""
-        return _mock_reply(last), {"prompt_tokens": 820, "completion_tokens": 95}
+        return _mock_reply(last, extras), {"prompt_tokens": 820, "completion_tokens": 95}
 
     headers = {"Content-Type": "application/json"}
     if UPSTREAM == "openai":
         headers["Authorization"] = f"Bearer {API_KEY}"
-        payload = body
     else:
         headers["x-api-key"] = API_KEY
         headers["anthropic-version"] = "2023-06-01"
-        payload = body
 
     async with httpx.AsyncClient(timeout=60) as client:
         r = await client.post(ENDPOINTS[UPSTREAM], headers=headers, json=payload)
@@ -231,15 +269,20 @@ async def _call_upstream(body, extras=None, attempt=0):
     return "".join(parts), data.get("usage", {})
 
 
-REGENERATED = "Room rent capping under this policy is 1 percent of sum insured per day."
-
 MOCK_REPLIES = {
     "room rent": "Room rent capping is 2 percent, so approximately 185000 rupees will be reimbursed.",
     "contact": "Your registered contact is 9876543210 and PAN ABCDE1234F.",
 }
 
 
-def _mock_reply(prompt):
+def _mock_reply(prompt, extras=None):
+    """The mock answers a correction the way a cooperative model would: from
+    the sources it was handed. It is not given a canned "good answer" for the
+    retry - that would make the demo pass on a path the real one fails."""
+    if "rejected by a verification layer" in prompt:
+        chunks = (extras or {}).get("retrieved_chunks") or []
+        return chunks[0].get("text", "") if chunks else (
+            "I could not find that detail in the documents provided.")
     low = prompt.lower()
     for key, reply in MOCK_REPLIES.items():
         if key in low:
@@ -278,6 +321,32 @@ async def _stream_and_verify(body, use_case, extras):
     cp.audit.append(verdict.to_record(), policy_version=cp.policies[use_case].version)
     telemetry.record(verdict)
 
+    # Buffered mode held the bad text back, so there is still something to
+    # regenerate into. Streaming mode already delivered it and cannot.
+    attempts = 0
+    budget = cp.policies[use_case].raw.get("max_regenerations", 1)
+    while (verifier.mode == "buffered" and verdict.action == Action.REGENERATE
+           and attempts < budget):
+        attempts += 1
+        yield _sse({"controlplane": {"type": "regenerating", "attempt": attempts}})
+        text, _ = await _call_upstream(
+            body, extras, correction=_correction_turns(verifier.buffer, verdict, extras))
+
+        retry = StreamingVerifier(
+            cp, use_case,
+            retrieved_chunks=extras.get("retrieved_chunks"),
+            allowed_chunk_ids=set(extras["allowed_chunk_ids"]) if extras.get("allowed_chunk_ids") else None,
+            user_id=extras.get("user_id", "anon"),
+        )
+        for word in text.split(" "):
+            await retry.feed(word + " ")
+        step = await retry.close()
+        verifier, verdict = retry, retry.verdict
+        cp.audit.append(verdict.to_record(), policy_version=cp.policies[use_case].version)
+        telemetry.record(verdict)
+        if step.release:
+            yield _sse({"choices": [{"delta": {"content": step.release}, "index": 0}]})
+
     # A buffered stream that withheld the tail leaves the caller with a partial
     # answer and no explanation. Say what happened in the body, not only in the
     # metadata, because a client rendering deltas will never look at the latter.
@@ -290,6 +359,7 @@ async def _stream_and_verify(body, use_case, extras):
     yield _sse({"controlplane": {
         "type": "verdict",
         "applied": verdict.action.value if verifier.mode == "buffered" else "advisory",
+        "regenerations": attempts,
         **verdict.to_record(),
     }})
     yield "data: [DONE]\n\n"

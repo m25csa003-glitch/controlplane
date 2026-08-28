@@ -32,7 +32,7 @@ Other entry points:
     python3 demo/run_feedback.py            # reviews retuning thresholds
     uvicorn controlplane.proxy.gateway:app  # gateway + dashboard
     python3 eval/run_eval.py                # the full benchmark, ~45 min with a key
-    pytest tests/                           # 45 tests, no network
+    pytest tests/                           # 49 tests, no network
 
 ## What it does
 

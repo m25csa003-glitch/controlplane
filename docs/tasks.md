@@ -21,7 +21,7 @@ Round 2 implementation was carried out by Akshat Jain.
 | Feedback loop | reviews retune thresholds | `demo/run_feedback.py` |
 | Evaluation | 319 labelled cases, 4 configs, 2 sweeps | `eval/results/report.md` |
 | Dashboard | live SSE feed, queue, cost, limits | `dashboard/index.html` |
-| Tests | 45, hermetic, no network | `pytest tests/` |
+| Tests | 49, hermetic, no network | `pytest tests/` |
 
 ## Known gaps, measured rather than hidden
 
@@ -52,7 +52,11 @@ is where a correct verdict and a wrong delivery diverge:
   once its check had *finished*, never checking what it *found*. A response
   ruled `block` arrived in full, followed by a message saying it was blocked.
 - **`regenerate` was a no-op.** Nothing anywhere asked the model again; the
-  wrong answer went out untouched. The headline demo case routes to it.
+  wrong answer went out untouched. The headline demo case routes to it. The
+  gateway now re-asks with the rejection, the unsupported claim and the
+  sources — re-sending the original request unchanged would have been a coin
+  flip on sampling noise, not a regeneration. Both the batch and the buffered
+  streaming path do it; `streaming` mode cannot, having already delivered.
 - **The cost column silently read zero.** The eval priced an OpenAI model
   against Anthropic, the lookup failed, and the money number became 0.000%
   without complaint.
