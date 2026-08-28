@@ -6,12 +6,17 @@ this.
 
 ## How long
 
-**Target 2:45. Hard ceiling 3:00.**
+**2:35 of script. About 2:55 delivered, with the beats.**
 
 The Round 2 brief asks for a demo video without naming a length, and the team's
 own Round 1 slide promised a three-minute walkthrough. Three minutes is the
 convention, so going over reads as not having edited rather than as having more
 to say.
+
+Measured, not guessed: the spoken text below is **401 words**. At 140–150 words
+a minute — a clear technical pace, not a rush — that is 2:40 to 2:52, plus about
+fifteen seconds of deliberate pauses. Read it aloud once with a timer before you
+record; if you land over 3:10 you are pausing too long, not saying too much.
 
 The number that actually matters is not the total, it is the **first fifteen
 seconds**. A judge working through a stack of submissions decides in that window
@@ -53,19 +58,15 @@ them, don't rush past them.
 category of risk. "Hallucination" is abstract; "one percent became two percent"
 is not.*
 
-### 0:18 – 0:35 · What we built, in one line
+### 0:18 – 0:50 · The same answer, three different verdicts
 
-*Screen: the request → ControlPlane → model diagram, or just the gateway running.*
+*Screen: `python3 demo/run_pipeline.py --models`.*
 
-> ControlPlane closes that gap to **zero**. It sits between the application and
-> the model, checks every response before it reaches anyone, and decides what to
-> do about it — pass, annotate, redact, regenerate, escalate, or block.
->
-> Your application changes **one line**: the base URL.
+> ControlPlane sits between the application and the model and checks every
+> response before it reaches anyone. Your app changes **one line** — the base
+> URL.
 
-### 0:35 – 1:05 · The same answer, three different verdicts
-
-*Screen: `python3 demo/run_pipeline.py --models`. Point at three lines.*
+*Point at three lines:*
 
 ```
 hallucinated number   customer_support  -> regenerate
@@ -75,23 +76,19 @@ hallucinated number   customer_support  -> regenerate
 
 > Same sentence. Three answers.
 >
-> In customer support, being wrong costs about four hundred rupees, so we ask
-> the model again. In the internal copilot it costs sixty, so we flag it and
-> move on. In a regulated decision it costs **fifty thousand** — so a human
-> looks at it before anyone acts.
+> In customer support, being wrong costs four hundred rupees — so we ask again.
+> In a regulated decision it costs **fifty thousand** — so a human looks first.
 >
-> Nothing in the code knows what a use case is. **All of that is a config file.**
-> A new jurisdiction is a config change, not a release.
+> Nothing in the code knows what a use case is. **All of it is a config file.**
 
-*This is the single most persuasive thirty seconds in the video. Do not rush it.*
+*The most persuasive thirty seconds in the video. Do not rush it.*
 
-### 1:05 – 1:35 · The number the whole design rests on
+### 0:50 – 1:20 · The number the whole design rests on
 
 *Screen: `eval/results/report.md`, headline table.*
 
-> Three hundred and nineteen labelled cases. Live judge model. Here is us
-> against the obvious way to do this — send **every** response to a judge and
-> ask if it's right.
+> Three hundred and nineteen labelled cases, live judge. Us against the obvious
+> way to do this — send **every** response to a judge.
 
 | | catch | false positives | latency | cost |
 |---|---|---|---|---|
@@ -99,66 +96,60 @@ hallucinated number   customer_support  -> regenerate
 | **the cascade** | **94.6%** | **7.4%** | **184 ms** | **Rs 1.13** |
 
 > Same catch rate. **Half** the false positives. **Twenty-two times** faster.
-> And it costs **under four percent**.
+> Under **four percent** of the cost.
 >
-> Checking everything with a big model doesn't buy you accuracy. It buys you a
-> bill.
+> Checking everything with a big model doesn't buy accuracy. It buys a bill.
 
-### 1:35 – 1:55 · Show it working live
+### 1:20 – 1:38 · Show it working live
 
 *Screen: the dashboard, traffic flowing.*
 
-> This is it running. Every response gets the cheap checks. **Under three
-> percent** ever reach the judge — the ones the cheap checks were genuinely
-> unsure about.
+> Running live. Every response gets the cheap checks; **under three percent**
+> reach the judge — the ones tier one was genuinely unsure about.
 >
-> And every number here is measured against a limit **that policy set for
-> itself**. When customer support goes over its own latency budget, it turns
-> red — nobody had to notice.
+> Every number is measured against a limit **that policy set for itself**. Go
+> over your own budget and it turns red. Nobody had to notice.
 
-### 1:55 – 2:20 · The reframe
+### 1:38 – 2:05 · The reframe
 
 *Screen: the two money tiles side by side.*
 
-> Now the part that changed how we think about this product.
+> Then the measurement changed how we think about the product.
 >
-> At the volume in the brief, verification costs about **five and a half
-> thousand rupees a year**.
->
-> The human review it generates, for **one** use case, costs **three point three
-> six crore**.
+> At the brief's volume, verification costs about **five and a half thousand
+> rupees a year**. The human review it generates, for **one** use case, costs
+> **three point three six crore**.
 
-*Beat.*
+*Beat. Let that sit.*
 
 > Verification was never the expensive part. **Human attention is.**
 >
-> So this isn't a way to buy cheap checking. It's a way to control **how much
-> review you have to buy** — and to justify every hour of it. Moving the
-> escalation rate by one percentage point is worth more than the entire
-> verification bill.
+> So this isn't cheap checking. It's a way to control **how much review you have
+> to buy**. Moving the escalation rate one percentage point is worth more than
+> the entire verification bill.
 
 *This is the strongest thing in the pitch. It is a genuine insight, it came out
 of the measurement, and almost no one else will say it.*
 
-### 2:20 – 2:38 · What it can't do
+### 2:05 – 2:25 · What it can't do
 
 *Screen: the weaknesses table in the report.*
 
 > And here is what it gets wrong.
 >
-> Multi-hop claims: four out of nine. Quantifier flips — "up to" against "at
-> least" — it misses **forty-seven percent** of them.
+> Claims that need two sources: four of nine. Quantifier flips — "up to" against
+> "at least" — it misses **forty-seven percent**.
 >
-> We wrote this test set ourselves. An earlier version scored a hundred percent
-> on everything, which is exactly why the hard cases exist.
+> We wrote this test set. An earlier version scored a hundred percent on
+> everything, which is exactly why the hard cases exist.
 
 *Counterintuitive but true: this section raises credibility, it doesn't lower
 it. A judge who has watched ten flawless demos is looking for the one team that
 knows where its own edges are. Say it at normal pace — no apology in the voice.*
 
-### 2:38 – 2:45 · Close
+### 2:25 – 2:35 · Close
 
-> Regulated enterprises can't scale AI they can only audit in hindsight.
+> Enterprises can't scale AI they can only audit in hindsight.
 >
 > ControlPlane makes oversight something you **watch**, not something you
 > discover.
@@ -202,12 +193,39 @@ watching.
 - One take per section, cut between. A three-minute unbroken take will have you
   rushing the 1:05 block, which is the one that has to land.
 
-## If you run long
+## "Can three minutes cover everything?"
+
+No. And it should not try.
+
+The system has a policy layer, three tiers, an economics router, a cost meter, a
+hash-chained audit log, streaming-concurrent verification, a feedback loop, a
+dashboard, a 319-case benchmark and an OpenAI-compatible gateway. Narrated
+properly that is fifteen minutes. Compressed into three it becomes twelve
+seconds a topic, nothing lands, and the pace itself signals panic.
+
+**The video is not the submission.** The repository, the README,
+`eval/results/report.md` and `docs/proposal.md` are. The video's job is to make a
+judge open them, and to leave them with four things they could repeat afterwards:
+
+1. One response, three policies, three verdicts — behaviour lives in config.
+2. Same catch rate as judging everything, under four percent of the cost.
+3. Verification is cheap; human review is the real bill.
+4. This team published what its system gets wrong.
+
+A judge who remembers those four scores you well. A judge who was shown eleven
+features and remembers none scores you badly, however complete the coverage was.
+
+Everything cut has a home: the cascade internals and the audit chain are in
+`docs/demo_video.md`, the economics in `docs/proposal.md`, the failure modes in
+the report. Say "full benchmark in the repository" once, at the end, and let the
+artefacts do the work they were built to do.
+
+## If you still run long
 
 Cut in this order. The first two cost you almost nothing.
 
-1. The 0:18 "what we built" block — the demo at 0:35 explains it anyway.
-2. Half of 1:35 — the dashboard is a proof, not an argument.
+1. The one-line "what it is" at 0:18 — the demo that follows explains it anyway.
+2. Half of the dashboard block — it is a proof, not an argument.
 3. Nothing else. The three-verdict demo, the comparison table, the reframe and
    the weaknesses are the pitch. Losing any of them costs more than the time
    saved.
