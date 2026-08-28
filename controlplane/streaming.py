@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 
 from .cost.meter import CostBreakdown
 from .router.router import decide
-from .schema import RequestContext, Category
+from .schema import RequestContext, Category, Action
 from .text import sentences as split_sentences
 from .tiers import tier0_rules, tier1_classifiers, tier2_judge
 
@@ -35,9 +35,16 @@ class StreamingVerifier:
 
       streaming   tokens go out as they arrive. A check that trips afterwards
                   emits a correction event; the caller has already seen the text.
-      buffered    a completed sentence is held until its tier 0 and tier 1
-                  checks land. Nothing bad is ever shown, and the cost is one
-                  sentence of added latency.
+      buffered    a sentence is released only once its checks land clean.
+                  The first sentence that trips stops the release, and what
+                  follows is held with it - it reads as a continuation, and the
+                  action is not decided until the verdict. At the end the
+                  verdict decides: blocked and regenerated responses withhold
+                  the remainder entirely, a redaction blanks the offending
+                  spans, and anything milder releases it.
+
+    The cost of `buffered` is one sentence of latency on the clean path. The
+    cost of `streaming` is that a correction can only ever be a correction.
     """
 
     def __init__(self, plane, use_case, retrieved_chunks=None,
@@ -58,6 +65,8 @@ class StreamingVerifier:
         self.released = 0            # chars already forwarded
         self.dispatched = []         # sentences sent for checking, in order
         self.done = set()            # indices whose checks have landed
+        self.flagged = set()         # indices that tripped a check
+        self.withheld = ""           # text buffered mode held back
         self.signals = []
         self.tiers_run = set()
         self.breakdown = CostBreakdown()
@@ -120,11 +129,13 @@ class StreamingVerifier:
                 (time.perf_counter() - (self.last_token_at or stream_done)) * 1000, 2),
             "inline_check_ms": round(inline_ms, 2),
             "sentences": len(self.dispatched),
+            "withheld_chars": len(self.withheld),
             "sentence_checks_ms": self.sentence_checks,
             "tier2_ran": bool(judged),
         }
 
-        return StreamStep(release=self._release(final=True), events=events)
+        return StreamStep(release=self._final_release(), events=events,
+                          held=len(self.withheld))
 
     # --- internals ------------------------------------------------------
 
@@ -164,6 +175,8 @@ class StreamingVerifier:
 
         self.signals += signals
         self.done.add(idx)
+        if signals:
+            self.flagged.add(idx)
         if not signals:
             return []
         return [{
@@ -219,19 +232,56 @@ class StreamingVerifier:
             i += 1
         return i
 
-    def _release(self, final=False):
-        """How much of the buffer the policy allows out right now."""
-        if self.mode == "streaming" or final:
+    def _release(self):
+        """How much of the buffer the policy allows out mid-stream."""
+        if self.mode == "streaming":
             out = self.buffer[self.released:]
             self.released = len(self.buffer)
             return out
 
-        cleared = self._verified_prefix()
-        if cleared == 0:
-            return ""
-        safe_to = self.dispatched[cleared - 1].end
+        # buffered: release the run of sentences that are both verified and
+        # clean. Stop at the first one that tripped a check - what follows it
+        # reads as a continuation of it, and the action for the response is not
+        # decided until the verdict.
+        safe_to = self.released
+        for i in range(self._verified_prefix()):
+            if i in self.flagged:
+                break
+            safe_to = self.dispatched[i].end
         if safe_to <= self.released:
             return ""
         out = self.buffer[self.released:safe_to]
         self.released = safe_to
+        return out
+
+    def _final_release(self):
+        """What the policy allows out once the verdict exists.
+
+        In streaming mode the text has already gone; a late verdict is a
+        correction, not a gate. In buffered mode the held-back remainder is
+        released only if the verdict permits it — otherwise a response that was
+        going to be blocked would still arrive, one sentence at a time, which is
+        the failure this mode exists to prevent."""
+        remaining = self.buffer[self.released:]
+        self.released = len(self.buffer)
+        if self.mode == "streaming":
+            return remaining
+
+        self.withheld = remaining
+        action = self.verdict.action
+        if action in (Action.BLOCK, Action.REGENERATE):
+            return ""
+        if action == Action.REDACT_SPAN:
+            return self._redact(remaining, len(self.buffer) - len(remaining))
+        self.withheld = ""
+        return remaining
+
+    def _redact(self, text, offset):
+        """Blank the offending spans, keeping the rest of the sentence."""
+        spans = sorted((s.span for s in self.signals if s.span), reverse=True)
+        out = text
+        for start, end in spans:
+            start, end = start - offset, end - offset
+            if 0 <= start < end <= len(out):
+                out = out[:start] + "[redacted]" + out[end:]
         return out

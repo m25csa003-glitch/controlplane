@@ -6,6 +6,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from controlplane.pipeline import ControlPlane
+from controlplane.schema import Action
 from controlplane.streaming import StreamingVerifier
 
 CHUNKS = [
@@ -66,6 +67,37 @@ async def test_nothing_is_lost_or_duplicated(cp):
         v = StreamingVerifier(cp, use_case, retrieved_chunks=CHUNKS)
         out = await drive(v, CLEAN)
         assert out.strip() == CLEAN.strip(), use_case
+
+
+@pytest.mark.asyncio
+async def test_buffered_does_not_deliver_what_it_flagged(cp):
+    """The failure this mode exists to prevent: the verdict says regenerate and
+    the caller has already been shown the sentence it was about."""
+    v = StreamingVerifier(cp, "customer_support", retrieved_chunks=CHUNKS)
+    out = await drive(v, DIRTY)
+    assert v.verdict.action != Action.PASS
+    assert "2 percent" not in out
+    assert "1 percent" in out          # the good sentence still went out
+
+
+@pytest.mark.asyncio
+async def test_streaming_mode_admits_it_already_delivered(cp):
+    """The other half of the contract. streaming releases immediately, so a late
+    verdict is a correction - and the text is out. Pretending otherwise would be
+    the lie the gateway's `advisory` label exists to avoid."""
+    v = StreamingVerifier(cp, "internal_copilot", retrieved_chunks=CHUNKS)
+    out = await drive(v, DIRTY)
+    assert "2 percent" in out
+    assert v.withheld == ""
+
+
+@pytest.mark.asyncio
+async def test_a_blocked_response_withholds_everything_after_the_trip(cp):
+    v = StreamingVerifier(cp, "customer_support", retrieved_chunks=CHUNKS)
+    out = await drive(v, "Your PAN is ABCDE1234F and the cap is 2 percent.")
+    assert v.verdict.action == Action.BLOCK
+    assert "ABCDE1234F" not in out
+    assert v.withheld
 
 
 @pytest.mark.asyncio

@@ -21,7 +21,7 @@ Round 2 implementation was carried out by Akshat Jain.
 | Feedback loop | reviews retune thresholds | `demo/run_feedback.py` |
 | Evaluation | 319 labelled cases, 4 configs, 2 sweeps | `eval/results/report.md` |
 | Dashboard | live SSE feed, queue, cost, limits | `dashboard/index.html` |
-| Tests | 33, hermetic, no network | `pytest tests/` |
+| Tests | 37, hermetic, no network | `pytest tests/` |
 
 ## Known gaps, measured rather than hidden
 
