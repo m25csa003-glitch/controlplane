@@ -21,7 +21,7 @@ Round 2 implementation was carried out by Akshat Jain.
 | Feedback loop | reviews retune thresholds | `demo/run_feedback.py` |
 | Evaluation | 319 labelled cases, 4 configs, 2 sweeps | `eval/results/report.md` |
 | Dashboard | live SSE feed, queue, cost, limits | `dashboard/index.html` |
-| Tests | 37, hermetic, no network | `pytest tests/` |
+| Tests | 45, hermetic, no network | `pytest tests/` |
 
 ## Known gaps, measured rather than hidden
 
@@ -42,6 +42,20 @@ Round 2 implementation was carried out by Akshat Jain.
   measure thinking-token output against. Labelled as estimated everywhere.
 - **HHEM does not load** under transformers 5.x. It stays first in the
   preference list for the day that changes.
+
+## Fixed after external testing
+
+Three were found by someone driving the gateway rather than the library, which
+is where a correct verdict and a wrong delivery diverge:
+
+- **Streaming delivered what it blocked.** Buffered mode released each sentence
+  once its check had *finished*, never checking what it *found*. A response
+  ruled `block` arrived in full, followed by a message saying it was blocked.
+- **`regenerate` was a no-op.** Nothing anywhere asked the model again; the
+  wrong answer went out untouched. The headline demo case routes to it.
+- **The cost column silently read zero.** The eval priced an OpenAI model
+  against Anthropic, the lookup failed, and the money number became 0.000%
+  without complaint.
 
 ## Not built, deliberately
 

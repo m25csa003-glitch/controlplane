@@ -2,6 +2,7 @@ import json
 import os
 import time
 import asyncio
+from contextlib import asynccontextmanager
 
 from pathlib import Path
 
@@ -26,14 +27,8 @@ ENDPOINTS = {
     "anthropic": "https://api.anthropic.com/v1/messages",
 }
 
-app = FastAPI(title="ControlPlane Gateway")
-telemetry = Telemetry()
-cp = ControlPlane(audit_path="audit.jsonl", listener=telemetry.record)
-DASHBOARD = Path(__file__).resolve().parents[2] / "dashboard" / "index.html"
-
-
-@app.on_event("startup")
-def _load_tier1():
+@asynccontextmanager
+async def lifespan(app):
     """Load the classifiers before serving.
 
     Without them grounding falls back to lexical overlap, which lands far more
@@ -45,8 +40,15 @@ def _load_tier1():
     just slower and dearer, and /health says which mode is live."""
     if os.getenv("CP_SKIP_MODELS"):
         print("[gateway] CP_SKIP_MODELS set; tier 1 runs on the lexical fallback")
-        return
-    tier1_classifiers.load_models()
+    else:
+        tier1_classifiers.load_models()
+    yield
+
+
+app = FastAPI(title="ControlPlane Gateway", lifespan=lifespan)
+telemetry = Telemetry()
+cp = ControlPlane(audit_path="audit.jsonl", listener=telemetry.record)
+DASHBOARD = Path(__file__).resolve().parents[2] / "dashboard" / "index.html"
 
 
 @app.get("/health")
@@ -114,20 +116,33 @@ async def chat_completions(
             media_type="text/event-stream",
         )
 
+    policy = cp.policies[use_case]
     upstream_start = time.perf_counter()
+
+    def _verify(t, u):
+        return cp.verify(
+            t, use_case,
+            retrieved_chunks=extras.get("retrieved_chunks"),
+            allowed_chunk_ids=set(extras["allowed_chunk_ids"]) if extras.get("allowed_chunk_ids") else None,
+            user_id=extras.get("user_id", "anon"),
+            usage=u, model=extras.get("price_as", DEMO_UPSTREAM[0]),
+            provider=extras.get("price_provider", DEMO_UPSTREAM[1]),
+        )
+
     text, usage = await _call_upstream(body, extras)
+    verdict = _verify(text, usage)
+
+    # regenerate means ask the model again, not "deliver it anyway". Without
+    # this the action was a no-op: the router said the answer was wrong and the
+    # gateway handed it over untouched.
+    attempts = 0
+    budget = policy.raw.get("max_regenerations", 1)
+    while verdict.action == Action.REGENERATE and attempts < budget:
+        attempts += 1
+        text, usage = await _call_upstream(body, extras, attempt=attempts)
+        verdict = _verify(text, usage)
+
     upstream_ms = (time.perf_counter() - upstream_start) * 1000
-
-    verdict = cp.verify(
-        text,
-        use_case,
-        retrieved_chunks=extras.get("retrieved_chunks"),
-        allowed_chunk_ids=set(extras["allowed_chunk_ids"]) if extras.get("allowed_chunk_ids") else None,
-        user_id=extras.get("user_id", "anon"),
-        usage=usage, model=extras.get("price_as", DEMO_UPSTREAM[0]),
-        provider=extras.get("price_provider", DEMO_UPSTREAM[1]),
-    )
-
     delivered = _apply_action(text, verdict)
 
     return {
@@ -142,6 +157,7 @@ async def chat_completions(
         "usage": usage,
         "controlplane": {
             **verdict.to_record(),
+            "regenerations": attempts,
             "upstream_ms": round(upstream_ms, 2),
             "overhead_pct": round(100 * verdict.latency_ms / max(upstream_ms, 1e-6), 2),
         },
@@ -151,8 +167,20 @@ async def chat_completions(
 def _apply_action(text, verdict):
     if verdict.action == Action.BLOCK:
         return "[withheld by ControlPlane: " + verdict.reason + "]"
+    if verdict.action == Action.REGENERATE:
+        # Only reachable once the regeneration budget is spent. The answer is
+        # still wrong, so it is not delivered - the caller gets the reason.
+        return ("[withheld by ControlPlane: regeneration did not produce a "
+                f"grounded answer. {verdict.reason}]")
     if verdict.action == Action.REDACT_SPAN:
         spans = sorted([s.span for s in verdict.signals if s.span], reverse=True)
+        if not spans:
+            # Something tripped or the router would not have chosen redaction,
+            # but nothing carried a span to redact. Delivering the text
+            # unchanged would silently turn the strictest available edit into a
+            # pass, so withhold instead.
+            return ("[withheld by ControlPlane: flagged for redaction but the "
+                    f"span could not be located. {verdict.reason}]")
         out = text
         for start, end in spans:
             out = out[:start] + "[redacted]" + out[end:]
@@ -164,9 +192,15 @@ def _apply_action(text, verdict):
     return text
 
 
-async def _call_upstream(body, extras=None):
+async def _call_upstream(body, extras=None, attempt=0):
     if UPSTREAM == "mock":
         await asyncio.sleep(0.05)
+        # On a regeneration the mock returns a grounded answer, so the retry
+        # path is visible end to end. A real model has no such guarantee, which
+        # is why max_regenerations is finite and the action falls through to
+        # withholding when the budget runs out.
+        if attempt and not (extras or {}).get("mock_response"):
+            return REGENERATED, {"prompt_tokens": 820, "completion_tokens": 95}
         # A caller replaying a fixture supplies the response it wants checked.
         # Without this the mock answers everything with the same sentence and
         # the dashboard shows one verdict repeated.
@@ -196,6 +230,8 @@ async def _call_upstream(body, extras=None):
     parts = [b.get("text", "") for b in data.get("content", []) if b.get("type") == "text"]
     return "".join(parts), data.get("usage", {})
 
+
+REGENERATED = "Room rent capping under this policy is 1 percent of sum insured per day."
 
 MOCK_REPLIES = {
     "room rent": "Room rent capping is 2 percent, so approximately 185000 rupees will be reimbursed.",
@@ -241,6 +277,13 @@ async def _stream_and_verify(body, use_case, extras):
     verdict = verifier.verdict
     cp.audit.append(verdict.to_record(), policy_version=cp.policies[use_case].version)
     telemetry.record(verdict)
+
+    # A buffered stream that withheld the tail leaves the caller with a partial
+    # answer and no explanation. Say what happened in the body, not only in the
+    # metadata, because a client rendering deltas will never look at the latter.
+    if verifier.withheld:
+        yield _sse({"choices": [{"delta": {"content":
+                    f"\n\n[withheld by ControlPlane: {verdict.reason}]"}, "index": 0}]})
 
     # In streaming mode the caller has already seen the text, so a late verdict
     # is a correction rather than a gate. Say which it was.

@@ -37,6 +37,8 @@ costs:
   cost_of_being_wrong: 50000      # INR, assumed: regulatory exposure of one bad decision
   cost_of_human_review: 200       # INR, assumed: reviewer with domain expertise
 
+max_regenerations: 2     # retries before a 'regenerate' verdict withholds instead
+
 actions:
   pii_detected: block
   ungrounded_claim: escalate

@@ -37,6 +37,8 @@ costs:
   cost_of_being_wrong: 400        # INR, assumed: refund + handling of one bad answer
   cost_of_human_review: 25        # INR, assumed: agent minute rate
 
+max_regenerations: 1     # retries before a 'regenerate' verdict withholds instead
+
 actions:
   pii_detected: block
   ungrounded_claim: redact_span

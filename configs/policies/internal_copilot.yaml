@@ -37,6 +37,8 @@ costs:
   cost_of_being_wrong: 60         # INR, assumed: employee rework time
   cost_of_human_review: 25
 
+max_regenerations: 1     # retries before a 'regenerate' verdict withholds instead
+
 actions:
   pii_detected: annotate
   ungrounded_claim: annotate

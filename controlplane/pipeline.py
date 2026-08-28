@@ -5,7 +5,7 @@ from .policy.loader import load_all
 from .tiers import tier0_rules, tier1_classifiers, tier2_judge
 from .router.router import decide
 from .audit.log import AuditLog
-from .cost.meter import CostMeter, CostBreakdown
+from .cost.meter import CostMeter, CostBreakdown, CostLine
 from .text import sentences as split_sentences
 from .schema import RequestContext, Category, Signal
 
@@ -88,7 +88,13 @@ class ControlPlane:
                 usage.get("completion_tokens", 0) or usage.get("output_tokens", 0),
             )
         except KeyError as exc:
+            # A missing price used to print and return zero, so the money column
+            # quietly read 0.000% and looked like a result. Book an unpriced
+            # line instead: it shows up in the record, and CostBreakdown.verified
+            # goes false, so the number cannot be mistaken for a measured one.
             print(f"[cost] {exc}")
+            breakdown.add(CostLine(label="llm_response", inr=0.0, verified=False,
+                                   method="unpriced"))
             return fallback
         breakdown.add(line)
         return line.inr

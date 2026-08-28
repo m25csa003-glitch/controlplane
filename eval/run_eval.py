@@ -80,7 +80,7 @@ def run_config(name, cfg, cases):
             c["response"], c["use_case"],
             retrieved_chunks=c["chunks"],
             allowed_chunk_ids=set(c["allowed_chunk_ids"]) if c["allowed_chunk_ids"] else None,
-            usage=USAGE, model=UPSTREAM_MODEL, provider="anthropic",
+            usage=USAGE, model=UPSTREAM_MODEL, provider=UPSTREAM_PROVIDER,
             audit_mode=cfg["audit_mode"],
         )
         rows.append({
