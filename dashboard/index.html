@@ -240,7 +240,10 @@ function render(){ tabs(); tiles(); lists();
 
 async function poll(){
   try{
-    const r = await fetch("dashboard/stats");
+    // Absolute, not relative: served from /dashboard, a relative path only
+  // resolves correctly because FastAPI redirects the trailing-slash form.
+  // Behind a proxy or a path prefix it would silently 404.
+    const r = await fetch("/dashboard/stats");
     const j = await r.json();
     state.snap = j.snapshot; state.queue = j.queue;
     if (!state.feed.length) state.feed = j.recent || [];
@@ -249,7 +252,7 @@ async function poll(){
 }
 
 function connect(){
-  const es = new EventSource("dashboard/events");
+  const es = new EventSource("/dashboard/events");
   es.onopen = () => { $("dot").classList.add("on"); $("conn").textContent = "live"; };
   es.onerror = () => { $("dot").classList.remove("on"); $("conn").textContent = "reconnecting"; };
   es.onmessage = ev => {
