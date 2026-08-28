@@ -20,8 +20,8 @@ Round 2 implementation was carried out by Akshat Jain.
 | Streaming | verification beside the token stream | `demo/run_streaming.py` |
 | Feedback loop | reviews retune thresholds | `demo/run_feedback.py` |
 | Evaluation | 319 labelled cases, 4 configs, 2 sweeps | `eval/results/report.md` |
-| Dashboard | live SSE feed, queue, cost, limits | `dashboard/index.html` |
-| Tests | 49, hermetic, no network | `pytest tests/` |
+| Dashboard | live SSE feed, four charts, queue, cost vs limits | `dashboard/index.html` |
+| Tests | 52, hermetic, no network | `pytest tests/` |
 
 ## Known gaps, measured rather than hidden
 

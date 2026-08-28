@@ -128,6 +128,43 @@ h2 .c{font-size:11px;font-weight:400;color:var(--faint)}
 .empty{padding:30px 14px;text-align:center;color:var(--faint);font-size:12px}
 footer{margin-top:26px;padding-top:14px;border-top:1px solid var(--rule);
   color:var(--faint);font-size:11.5px}
+
+/* ---- charts -------------------------------------------------------------
+   Severity is an ordered scale, not a set of identities, so the stack uses a
+   sequential ramp - light is "we let it through", dark is "we stopped it".
+   The dashboard's own status colours were tried first and the validator
+   rejected them as a categorical set: green and teal sit 6.5 dE apart, red and
+   amber 4.8 under deuteranopia. They stay on the pills, where each sits alone
+   with a text label; adjacent stacked segments need real separation.
+   Each mode's ramp is stepped for its own surface, not flipped. */
+.viz{
+  --sev-1:#CFE6E8; --sev-2:#8FCBD0; --sev-3:#3D95A0; --sev-4:#0E5A63;
+  --grid:var(--rule); --mark:#0E5A63; --mark-soft:#8FCBD0;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .viz{
+  --sev-1:#173F45; --sev-2:#1F6B74; --sev-3:#3AA3AE; --sev-4:#7FD3DA;
+  --mark:#7FD3DA; --mark-soft:#1F6B74;
+}}
+:root[data-theme="dark"] .viz{
+  --sev-1:#173F45; --sev-2:#1F6B74; --sev-3:#3AA3AE; --sev-4:#7FD3DA;
+  --mark:#7FD3DA; --mark-soft:#1F6B74;
+}
+.charts{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:22px}
+@media (max-width:900px){.charts{grid-template-columns:1fr}}
+.card{background:var(--surface);border:1px solid var(--rule);border-radius:5px;
+  padding:14px 16px 12px}
+.card h3{font-family:Archivo,system-ui,sans-serif;font-size:12.5px;font-weight:600;
+  color:var(--ink);margin:0 0 2px}
+.card p{margin:0 0 12px;font-size:11px;color:var(--faint);line-height:1.45}
+.card svg{display:block;width:100%;overflow:visible}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:10px;font-size:10.5px;
+  color:var(--muted)}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:2px;
+  margin-right:5px;vertical-align:-1px}
+.vlabel{font-family:"IBM Plex Mono",monospace;font-size:10px;fill:var(--faint)}
+.vval{font-family:"IBM Plex Mono",monospace;font-size:10.5px;fill:var(--body);
+  font-variant-numeric:tabular-nums}
+.vnone{padding:22px 0;text-align:center;color:var(--faint);font-size:11.5px}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 </style>
 </head>
@@ -148,6 +185,8 @@ footer{margin-top:26px;padding-top:14px;border-top:1px solid var(--rule);
 <div class="tabs" id="tabs" role="tablist"></div>
 <div class="funnel" id="funnel"></div>
 <div class="tiles" id="tiles"></div>
+
+<div class="charts viz" id="charts"></div>
 
 <div class="cols">
   <div>
@@ -298,7 +337,150 @@ function lists(){
   state.feed.forEach(r=>r._new=false);
 }
 
-function render(){ tabs(); funnel(); tiles(); lists();
+// --- charts ---------------------------------------------------------------
+// Severity buckets, ordered by how much the layer intervened. Grouped by what
+// actually reached the caller, not by the action's name: escalate delivers with
+// a flag, regenerate withholds once its budget is spent.
+const SEVERITY = [
+  {key:"delivered", label:"Delivered",  actions:["pass"],                     v:"--sev-1"},
+  {key:"flagged",   label:"Flagged",    actions:["annotate","escalate"],      v:"--sev-2"},
+  {key:"edited",    label:"Edited",     actions:["redact_span"],              v:"--sev-3"},
+  {key:"withheld",  label:"Withheld",   actions:["block","regenerate"],       v:"--sev-4"},
+];
+const esc = s => String(s).replace(/[<>&"]/g, c=>({"<":"&lt;",">":"&gt;","&":"&amp;",'"':"&quot;"}[c]));
+
+function severityOf(actions){
+  return SEVERITY.map(s => ({...s, n: s.actions.reduce((a,k)=>a+(actions[k]||0),0)}));
+}
+
+// Stacked horizontal bar. 2px surface gaps do the separating - no strokes.
+function chartActions(){
+  const ucs = state.snap.use_cases || {};
+  const rows = (state.tab === "all" ? Object.keys(ucs).sort() : [state.tab])
+    .filter(n => ucs[n]).map(n => ({name:n, ...ucs[n]}));
+  if (!rows.length) return "";
+
+  const H = 26, GAP = 12, W = 100;
+  const body = rows.map((r,i) => {
+    const y = i*(H+GAP), segs = severityOf(r.actions), tot = r.n || 1;
+    let x = 0;
+    const bars = segs.filter(s=>s.n).map(s => {
+      const w = 100*s.n/tot, x0 = x; x += w;
+      // 2px of surface between segments, taken from the segment's own width
+      return `<rect x="${x0}%" y="${y+13}" width="${w}%" height="${H-13}"
+        fill="var(${s.v})" rx="2"><title>${esc(s.label)}: ${s.n} of ${r.n}</title></rect>
+        <rect x="${x0}%" y="${y+13}" width="2" height="${H-13}" fill="var(--surface)"/>`;
+    }).join("");
+    const worst = segs.filter(s=>s.n).pop();
+    return `<text class="vlabel" x="0" y="${y+8}">${esc(r.name.replace(/_/g," "))}</text>
+      <text class="vval" x="100%" y="${y+8}" text-anchor="end">${r.n}</text>${bars}`;
+  }).join("");
+
+  return card("What happened to each response",
+    "Grouped by what reached the caller. Darker is more intervention.",
+    `<svg viewBox="0 0 ${W} ${rows.length*(H+GAP)}" preserveAspectRatio="none"
+        height="${rows.length*(H+GAP)}" role="img"
+        aria-label="Share of responses by how much the layer intervened">${body}</svg>`,
+    SEVERITY.map(s=>`<span><i style="background:var(${s.v})"></i>${s.label}</span>`).join(""));
+}
+
+// Single series, so one hue and no legend - the title names it.
+function chartCategories(){
+  const ucs = state.snap.use_cases || {};
+  const src = state.tab === "all" ? Object.values(ucs) : [ucs[state.tab]].filter(Boolean);
+  const tally = {};
+  for (const u of src) for (const [k,v] of Object.entries(u.categories||{})) tally[k]=(tally[k]||0)+v;
+  const rows = Object.entries(tally).sort((a,b)=>b[1]-a[1]);
+  if (!rows.length) return card("Which checks fired","Nothing has tripped yet.",
+    `<div class="vnone">No findings</div>`);
+
+  const max = rows[0][1], H = 18, GAP = 8;
+  const body = rows.map(([k,v],i)=>{
+    const y=i*(H+GAP);
+    return `<text class="vlabel" x="0" y="${y+12}">${esc(k)}</text>
+      <rect x="86" y="${y+3}" width="${Math.max(1, 74*v/max)}%" height="${H-6}"
+        fill="var(--mark)" rx="2"><title>${esc(k)}: ${v}</title></rect>
+      <text class="vval" x="100%" y="${y+12}" text-anchor="end">${v}</text>`;
+  }).join("");
+  return card("Which checks fired", "Findings by category. One response can trip several.",
+    `<svg viewBox="0 0 100 ${rows.length*(H+GAP)}" preserveAspectRatio="none"
+        height="${rows.length*(H+GAP)}" role="img"
+        aria-label="Findings by risk category">${body}</svg>`);
+}
+
+// Trend against a limit. The budget is the reason to look, so it is drawn.
+function chartLatency(){
+  const ucs = state.snap.use_cases || {};
+  const scope = state.tab === "all" ? null : state.tab;
+  const pts = state.feed.filter(r=>!scope||r.use_case===scope).slice(0,60).reverse()
+                        .map(r=>r.latency_ms);
+  if (pts.length < 2) return card("Latency, most recent first",
+    "Not enough traffic yet.", `<div class="vnone">Waiting</div>`);
+
+  const budget = scope ? ucs[scope]?.latency_budget_ms : null;
+  const top = Math.max(...pts, budget || 0) * 1.15;
+  const H = 78, w = 100/(pts.length-1);
+  const d = pts.map((v,i)=>`${i?"L":"M"}${(i*w).toFixed(2)} ${(H - H*v/top).toFixed(2)}`).join(" ");
+  const bud = budget ? H - H*budget/top : null;
+  const last = pts[pts.length-1];
+
+  return card("Latency, oldest to newest",
+    scope ? `Against the ${budget} ms this policy allows.` : "All use cases together.",
+    `<svg viewBox="0 0 100 ${H}" preserveAspectRatio="none" height="${H}" role="img"
+        aria-label="Verification latency over the most recent responses">
+      ${bud!=null?`<line x1="0" y1="${bud.toFixed(2)}" x2="100" y2="${bud.toFixed(2)}"
+        stroke="var(--grid)" stroke-width="1"/>
+        <text class="vlabel" x="0" y="${Math.max(9,bud-4).toFixed(2)}">budget ${budget} ms</text>`:""}
+      <path d="${d}" fill="none" stroke="var(--mark)" stroke-width="2"
+        stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+      <circle cx="100" cy="${(H - H*last/top).toFixed(2)}" r="4" fill="var(--mark)"
+        stroke="var(--surface)" stroke-width="2"/>
+     </svg>
+     <div class="legend"><span>latest ${last.toFixed(0)} ms</span></div>`);
+}
+
+// Emphasis, not categorical: tier 2 is the point, the rest is context.
+function chartTier2Cost(){
+  const a = agg();
+  if (!a || !a.n) return "";
+  const ucs = state.snap.use_cases || {};
+  const src = state.tab === "all" ? Object.values(ucs) : [ucs[state.tab]].filter(Boolean);
+  const t2cost = src.reduce((s,u)=>s+(u.tier2_inr||0),0);
+  const total  = src.reduce((s,u)=>s+(u.verify_inr||0),0);
+  if (!total) return card("What tier 2 costs",
+    "The judge has not run yet, so it has cost nothing.", `<div class="vnone">No judge calls</div>`);
+
+  const bars = [
+    {l:"of responses",       p:100*a.tier2_rate},
+    {l:"of what checking cost", p:100*t2cost/total},
+  ];
+  const H=22, GAP=16;
+  const body = bars.map((b,i)=>{
+    const y=i*(H+GAP);
+    return `<text class="vlabel" x="0" y="${y+9}">${esc(b.l)}</text>
+      <rect x="0" y="${y+13}" width="100%" height="${H-13}" fill="var(--raised)" rx="2"/>
+      <rect x="0" y="${y+13}" width="${Math.min(100,b.p).toFixed(1)}%" height="${H-13}"
+        fill="var(--mark)" rx="2"><title>${b.p.toFixed(1)}%</title></rect>
+      <text class="vval" x="100%" y="${y+9}" text-anchor="end">${b.p.toFixed(1)}%</text>`;
+  }).join("");
+  return card("What tier 2 costs",
+    "The judge runs on few responses and takes most of the verification spend. That gap is the cascade.",
+    `<svg viewBox="0 0 100 ${bars.length*(H+GAP)}" preserveAspectRatio="none"
+        height="${bars.length*(H+GAP)}" role="img"
+        aria-label="Tier 2 share of responses against its share of verification cost">${body}</svg>`);
+}
+
+function card(title, sub, svg, legend){
+  return `<div class="card"><h3>${title}</h3><p>${sub}</p>${svg}
+    ${legend?`<div class="legend">${legend}</div>`:""}</div>`;
+}
+
+function charts(){
+  $("charts").innerHTML = [chartActions(), chartCategories(),
+                           chartTier2Cost(), chartLatency()].filter(Boolean).join("");
+}
+
+function render(){ tabs(); funnel(); tiles(); charts(); lists();
   const u = state.snap.uptime_s;
   $("uptime").textContent = u ? `up ${u<60 ? u.toFixed(0)+"s" : (u/60).toFixed(1)+"m"}` : "";
 }

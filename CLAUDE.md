@@ -25,7 +25,7 @@ Working and measured: policy layer, tier 0 rules, tier 1 (NLI grounding +
 toxic-bert safety + bias heuristic), tier 2 judge (OpenAI verified live,
 Anthropic written but unrun), expected-cost router, cost meter, hash-chained
 audit, OpenAI-compatible gateway, streaming-concurrent verification, feedback
-loop, operator dashboard, 319-case benchmark, 49 tests.
+loop, operator dashboard, 319-case benchmark, 52 tests.
 
 Cascade: **94.6% catch, 7.4% false positives, Rs 1.13** against **Rs 30.14** for
 judging every response at the same catch rate.

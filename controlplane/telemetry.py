@@ -59,7 +59,7 @@ class Telemetry:
         t = self.totals.setdefault(verdict.use_case, {
             "n": 0, "actions": {}, "categories": {}, "tier2": 0,
             "verify_inr": 0.0, "llm_inr": 0.0, "billed_inr": 0.0,
-            "modelled_inr": 0.0, "latency": deque(maxlen=250),
+            "modelled_inr": 0.0, "tier2_inr": 0.0, "latency": deque(maxlen=250),
         })
         t["n"] += 1
         t["actions"][row["action"]] = t["actions"].get(row["action"], 0) + 1
@@ -81,6 +81,8 @@ class Telemetry:
                 t["billed_inr"] += line["inr"]
             else:
                 t["modelled_inr"] += line["inr"]
+            if line["label"] == "tier2_judge":
+                t["tier2_inr"] += line["inr"]
 
     # --- read -----------------------------------------------------------
 
@@ -109,6 +111,7 @@ class Telemetry:
                 "verify_inr": round(t["verify_inr"], 4),
                 "billed_inr": round(t["billed_inr"], 4),
                 "modelled_inr": round(t["modelled_inr"], 4),
+                "tier2_inr": round(t["tier2_inr"], 4),
                 "llm_inr": round(t["llm_inr"], 4),
                 "verify_pct_of_llm": (100 * t["verify_inr"] / t["llm_inr"]) if t["llm_inr"] else 0,
                 "p50_ms": _pct(lat, 50),

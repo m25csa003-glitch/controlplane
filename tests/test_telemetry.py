@@ -83,3 +83,25 @@ def test_the_queue_is_priced_at_the_policy_rate(plane):
     assert snap["review_rate_inr"] == rate
     assert snap["review_inr"] == 4 * rate
     assert snap["review_inr"] > snap["verify_inr"]
+
+
+def test_snapshot_carries_what_the_charts_plot(plane):
+    """The dashboard draws from this shape. A field quietly renamed here shows
+    up as an empty chart, not an error."""
+    cp, t = plane
+    cp.verify("Room rent capping is 2 percent per day.", "customer_support",
+              retrieved_chunks=CHUNKS)
+    u = t.snapshot(cp.policies)["use_cases"]["customer_support"]
+    for field in ("actions", "categories", "tier2_inr", "verify_inr",
+                  "latency_budget_ms", "review_inr", "billed_inr", "modelled_inr"):
+        assert field in u, field
+    assert isinstance(u["actions"], dict) and sum(u["actions"].values()) == u["n"]
+
+
+def test_billed_and_modelled_do_not_double_count(plane):
+    cp, t = plane
+    for _ in range(3):
+        cp.verify("Cashless treatment requires prior authorisation from the insurer.",
+                  "customer_support", retrieved_chunks=CHUNKS)
+    u = t.snapshot(cp.policies)["use_cases"]["customer_support"]
+    assert abs((u["billed_inr"] + u["modelled_inr"]) - u["verify_inr"]) < 1e-6
