@@ -73,7 +73,8 @@ multi-turn risk accumulation.
 - [x] README rewrite
 - [x] Operator dashboard
 - [x] Public GitHub repository
-- [ ] Demo video — script ready in `docs/demo_video.md`
+- [ ] Pitch video — script ready in `docs/pitch_video.md`
+- [ ] Technical walkthrough — script ready in `docs/demo_video.md`
 
 ## Rules that still hold
 

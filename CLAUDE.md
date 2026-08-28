@@ -30,7 +30,8 @@ loop, operator dashboard, 319-case benchmark, 52 tests.
 Cascade: **94.6% catch, 7.4% false positives, Rs 1.13** against **Rs 30.14** for
 judging every response at the same catch rate.
 
-Remaining: **the demo video** (script in `docs/demo_video.md`). That is the only
+Remaining: **the video**. Scripts are written: `docs/pitch_video.md` is the
+pitch, `docs/demo_video.md` the technical walkthrough. That is the only
 outstanding deliverable.
 
 Known open items, all recorded in `docs/tasks.md`: multi-hop grounding is 4/9,

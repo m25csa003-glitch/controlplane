@@ -1,5 +1,8 @@
 # Demo video script
 
+The technical walkthrough — the video a judge opens second, to check the
+thing is real. The pitch is `docs/pitch_video.md`; record that one first.
+
 Three minutes. Everything below is a real command with real output — nothing is
 staged, and the recording should show the terminal.
 
