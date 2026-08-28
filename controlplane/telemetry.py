@@ -79,8 +79,15 @@ class Telemetry:
             policy = (policies or {}).get(name)
             escalated = sum(t["actions"].get(a, 0)
                             for a in ("escalate", "block", "regenerate", "redact_span"))
+            # What this policy's queue costs at its own reviewer rate. The
+            # dashboard showed what verification cost and never what it asked a
+            # human to do, which is the larger number by three or four orders of
+            # magnitude and the one the product exists to move.
+            review_rate = policy.costs["cost_of_human_review"] if policy else 0
             out["use_cases"][name] = {
                 "n": t["n"],
+                "review_inr": round(escalated * review_rate, 2),
+                "review_rate_inr": review_rate,
                 "actions": t["actions"],
                 "categories": t["categories"],
                 "tier2_rate": t["tier2"] / t["n"] if t["n"] else 0,

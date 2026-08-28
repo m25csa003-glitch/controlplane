@@ -68,3 +68,18 @@ def test_listener_failure_is_not_silently_swallowed(plane):
     with pytest.raises(RuntimeError):
         cp.verify("Room rent capping is 2 percent per day.", "customer_support",
                   retrieved_chunks=CHUNKS)
+
+
+def test_the_queue_is_priced_at_the_policy_rate(plane):
+    """The dashboard showed what verification cost and never what it asked a
+    human to do - the larger number by orders of magnitude, and the one the
+    product exists to move."""
+    cp, t = plane
+    for _ in range(4):
+        cp.verify("Your PAN is ABCDE1234F.", "customer_support",
+                  retrieved_chunks=CHUNKS)
+    snap = t.snapshot(cp.policies)["use_cases"]["customer_support"]
+    rate = cp.policies["customer_support"].costs["cost_of_human_review"]
+    assert snap["review_rate_inr"] == rate
+    assert snap["review_inr"] == 4 * rate
+    assert snap["review_inr"] > snap["verify_inr"]

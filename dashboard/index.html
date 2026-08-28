@@ -51,6 +51,18 @@ h1{font-family:Archivo,system-ui,sans-serif;font-weight:700;font-size:21px;
 @media (prefers-reduced-motion:no-preference){.dot.on{animation:pulse 2.4s ease-in-out infinite}}
 @keyframes pulse{50%{opacity:.45}}
 header .sp{margin-left:auto;color:var(--faint);font-size:11.5px}
+.sub{margin:6px 0 0;max-width:62ch;color:var(--muted);font-size:12px;line-height:1.5}
+
+/* the cascade, as a shape rather than a percentage */
+.funnel{display:flex;gap:2px;margin-bottom:22px;font-size:11px}
+.funnel div{padding:9px 13px;background:var(--surface);border:1px solid var(--rule);
+  border-radius:4px;flex:none}
+.funnel div.grow{flex:1;min-width:0}
+.funnel b{display:block;font-family:Archivo,system-ui,sans-serif;font-size:16px;
+  font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
+.funnel span{color:var(--faint)}
+.funnel .t2{border-color:var(--accent);background:var(--accent-soft)}
+.funnel .t2 b{color:var(--accent)}
 
 .tabs{display:flex;gap:2px;margin-bottom:18px;flex-wrap:wrap}
 .tab{font:inherit;font-weight:500;background:transparent;border:1px solid var(--rule);
@@ -117,12 +129,18 @@ footer{margin-top:26px;padding-top:14px;border-top:1px solid var(--rule);
 <div class="wrap">
 
 <header>
-  <h1>ControlPlane</h1>
+  <div>
+    <h1>ControlPlane</h1>
+    <p class="sub">Every model response is checked before it reaches a user. Cheap
+      rules first, a judge model only where the cheap checks were unsure — and each
+      use case is measured against limits it set for itself.</p>
+  </div>
   <div class="live"><span class="dot" id="dot"></span><span id="conn">connecting</span></div>
   <div class="sp" id="uptime"></div>
 </header>
 
 <div class="tabs" id="tabs" role="tablist"></div>
+<div class="funnel" id="funnel"></div>
 <div class="tiles" id="tiles"></div>
 
 <div class="cols">
@@ -146,7 +164,19 @@ footer{margin-top:26px;padding-top:14px;border-top:1px solid var(--rule);
 <script>
 const state = {tab:"all", snap:{use_cases:{}}, feed:[], queue:[]};
 const $ = id => document.getElementById(id);
-const money = n => n < 0.01 ? (n*100).toFixed(3)+"p" : "Rs "+n.toFixed(3);
+// Verification costs fractions of a paisa and review queues cost lakhs, on the
+// same screen. One formatter has to stay readable across seven orders of
+// magnitude, in the units the audience actually uses.
+const money = n => {
+  if (!n) return "Rs 0";
+  if (n < 0.01)    return (n*100).toFixed(2)+"p";
+  if (n < 1)       return "Rs "+n.toFixed(3);
+  if (n < 100)     return "Rs "+n.toFixed(1);
+  if (n < 1000)    return "Rs "+n.toFixed(0);
+  if (n < 100000)  return "Rs "+(n/1000).toFixed(1)+"k";
+  if (n < 1e7)     return "Rs "+(n/1e5).toFixed(1)+" lakh";
+  return "Rs "+(n/1e7).toFixed(2)+" crore";
+};
 const pct = n => (n*100).toFixed(1)+"%";
 
 function tabs(){
@@ -161,18 +191,31 @@ function tabs(){
 function agg(){
   const ucs = state.snap.use_cases || {};
   if (state.tab !== "all") return ucs[state.tab] || null;
-  const out = {n:0, verify_inr:0, llm_inr:0, tier2:0, esc:0, p95:0, over:false};
+  const out = {n:0, verify_inr:0, llm_inr:0, review_inr:0, tier2:0, esc:0, p95:0, over:false};
   for (const u of Object.values(ucs)){
     out.n += u.n; out.verify_inr += u.verify_inr; out.llm_inr += u.llm_inr;
+    out.review_inr += u.review_inr || 0;
     out.tier2 += u.tier2_rate*u.n; out.esc += u.escalation_rate*u.n;
     out.p95 = Math.max(out.p95, u.p95_ms); out.over = out.over || u.over_budget;
   }
   if (!out.n) return null;
   return {n:out.n, verify_inr:out.verify_inr, llm_inr:out.llm_inr,
+    review_inr:out.review_inr,
     tier2_rate:out.tier2/out.n, escalation_rate:out.esc/out.n,
     max_escalation_rate:null, p95_ms:out.p95, latency_budget_ms:null,
     over_budget:out.over,
     verify_pct_of_llm: out.llm_inr ? 100*out.verify_inr/out.llm_inr : 0};
+}
+
+function funnel(){
+  const a = agg();
+  if (!a){ $("funnel").innerHTML = ""; return; }
+  const t2 = Math.round(a.tier2_rate * a.n);
+  $("funnel").innerHTML = `
+    <div><b>${a.n.toLocaleString()}</b><span>responses in</span></div>
+    <div class="grow"><b>100%</b><span>tier 0 rules + tier 1 classifiers &middot; ${money(a.verify_inr)} total</span></div>
+    <div class="t2"><b>${pct(a.tier2_rate)}</b><span>${t2} reached the judge</span></div>
+    <div><b>${pct(a.escalation_rate)}</b><span>reached a human</span></div>`;
 }
 
 function tile(k,v,s,opts={}){
@@ -193,15 +236,20 @@ function tiles(){
   $("tiles").innerHTML = [
     tile("Verified", a.n.toLocaleString(), "responses this session"),
     tile("Escalation rate", pct(a.escalation_rate),
-      escCap != null ? `cap ${pct(escCap)}` : "sent to a human",
+      overEsc ? `${(a.escalation_rate/escCap).toFixed(1)}x the ${pct(escCap)} this policy budgeted for`
+              : escCap != null ? `within the ${pct(escCap)} cap` : "sent to a human",
       {alert:overEsc, meter: escCap != null ? {pct:100*a.escalation_rate/escCap, over:overEsc} : null}),
     tile("Tier 2 rate", pct(a.tier2_rate), "reached the judge"),
     tile("p95 latency", a.p95_ms.toFixed(0)+" ms",
-      budget ? `budget ${budget} ms` : "added by verification",
+      a.over_budget && budget ? `over the ${budget} ms this policy allows`
+        : budget ? `inside the ${budget} ms budget` : "added by verification",
       {alert:a.over_budget, meter: budget ? {pct:100*a.p95_ms/budget, over:a.over_budget} : null}),
     tile("Verification spend", money(a.verify_inr),
-      a.verify_pct_of_llm ? a.verify_pct_of_llm.toFixed(2)+"% of model spend" : ""),
-    tile("Model spend", money(a.llm_inr), "the responses being checked"),
+      a.verify_pct_of_llm ? a.verify_pct_of_llm.toFixed(2)+"% of the model spend it checked" : ""),
+    tile("Review queue cost", money(a.review_inr || 0),
+      a.review_inr && a.verify_inr
+        ? Math.round(a.review_inr/a.verify_inr).toLocaleString()+"x what checking cost"
+        : "human time this session"),
   ].join("");
 }
 
@@ -233,7 +281,7 @@ function lists(){
   state.feed.forEach(r=>r._new=false);
 }
 
-function render(){ tabs(); tiles(); lists();
+function render(){ tabs(); funnel(); tiles(); lists();
   const u = state.snap.uptime_s;
   $("uptime").textContent = u ? `up ${u<60 ? u.toFixed(0)+"s" : (u/60).toFixed(1)+"m"}` : "";
 }
