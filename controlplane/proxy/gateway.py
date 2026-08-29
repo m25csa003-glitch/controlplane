@@ -1,4 +1,5 @@
 import json
+import re
 import os
 import time
 import asyncio
@@ -110,8 +111,12 @@ def _render_md(md):
         flush()
         s = line.strip()
         if s.startswith("#"):
-            n = len(s) - len(s.lstrip("#"))
-            out.append(f"<h{min(n,3)}>{_inline(s.lstrip('# '))}</h{min(n,3)}>")
+            n = min(len(s) - len(s.lstrip("#")), 3)
+            title = s.lstrip("# ")
+            # Slugged so the pitch can jump straight to a section instead of
+            # scrolling for it on camera.
+            slug = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
+            out.append(f"<h{n} id='{slug}'>{_inline(title)}</h{n}>")
         elif s.startswith("- "):
             out.append(f"<li>{_inline(s[2:])}</li>")
         elif s.startswith(">"):
@@ -119,7 +124,7 @@ def _render_md(md):
         elif s:
             out.append(f"<p>{_inline(s)}</p>")
     flush()
-    return REPORT_SHELL.replace("{{body}}", "\n".join(out))
+    return REPORT_SHELL.replace("{{body}}", "\n".join(out)).replace("{{nav}}", REPORT_NAV)
 
 
 @app.get("/dashboard/stats")
@@ -330,6 +335,15 @@ async def _call_upstream(body, extras=None, correction=None):
 
 
 
+# The two sections the pitch cuts to, plus the honesty section they sit inside.
+# Fixed to the corner so a jump is one click mid-take rather than a scroll.
+REPORT_NAV = ("<nav class=jump>"
+              "<a href='#headline'>headline</a>"
+              "<a href='#reading-this-honestly'>what it gets wrong</a>"
+              "<a href='#by-case-type-cascade'>by case type</a>"
+              "<a href='#latency-against-the-policy-budget'>latency</a>"
+              "</nav>")
+
 REPORT_SHELL = """<!doctype html><html lang=en><head><meta charset=utf-8>
 <meta name=viewport content="width=device-width,initial-scale=1">
 <title>ControlPlane evaluation</title>
@@ -369,7 +383,15 @@ td{padding:10px 14px;border-bottom:1px solid var(--rule);font-variant-numeric:ta
  vertical-align:top}
 tr:last-child td{border-bottom:none}
 tr:has(strong) td{background:var(--soft)}
-</style></head><body><div class=w>{{body}}</div></body></html>"""
+.jump{position:fixed;top:14px;right:16px;display:flex;gap:4px;flex-wrap:wrap;
+ background:var(--surface);border:1px solid var(--rule);border-radius:5px;padding:5px;
+ box-shadow:0 1px 3px rgba(0,0,0,.06);z-index:5}
+.jump a{font-size:10.5px;letter-spacing:.03em;color:var(--muted);text-decoration:none;
+ padding:4px 8px;border-radius:3px}
+.jump a:hover{background:var(--raised);color:var(--ink)}
+h1,h2,h3{scroll-margin-top:64px}
+@media (max-width:820px){.jump{display:none}}
+</style></head><body>{{nav}}<div class=w>{{body}}</div></body></html>"""
 
 MOCK_REPLIES = {
     "room rent": "Room rent capping is 2 percent, so approximately 185000 rupees will be reimbursed.",

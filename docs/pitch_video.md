@@ -90,7 +90,7 @@ loading models with nothing on screen. Film the finished output, not the wait.*
 
 ### 0:50 – 1:20 · The number the whole design rests on
 
-*Screen: `eval/results/report.md`, headline table.*
+*Screen: `localhost:8000/report#headline`*
 
 > Three hundred and nineteen labelled cases, live judge. Us against the obvious
 > way to do this — send **every** response to a judge.
@@ -138,7 +138,10 @@ of the measurement, and almost no one else will say it.*
 
 ### 2:05 – 2:25 · What it can't do
 
-*Screen: the weaknesses table in the report.*
+*Screen: `localhost:8000/report#reading-this-honestly`*
+
+*The jump links in the corner get there in one click. Do not scroll for it
+on camera.*
 
 > And here is what it gets wrong.
 >
