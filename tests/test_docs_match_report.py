@@ -66,3 +66,29 @@ def test_the_headline_numbers_are_quoted_as_published():
     for name, text in docs().items():
         if "94.6" in text:
             assert "7.4" in text, f"{name} quotes the catch rate without the false positive rate"
+
+
+@pytest.mark.xfail(reason="the committed report predates the judge-mode fix: its "
+                          "header says offline while its own call table records "
+                          "328 live calls. Regenerating it needs a re-run.",
+                   strict=False)
+def test_the_report_does_not_contradict_its_own_judge_counters():
+    """The header said the judge was offline while the call table in the same
+    document showed 328 live calls. The header was derived from which env var
+    was set - and it only looked for Anthropic keys, so an OpenAI-driven run
+    reported offline and then attached caveats about a stand-in judge that had
+    not been used."""
+    text = REPORT.read_text()
+    header = re.search(r"Tier 2 judge: \*\*(.+?)\*\*", text)
+    assert header, "the report no longer states a judge mode"
+    mode = header.group(1)
+
+    calls = re.search(r"## Judge calls(.+?)(?:\n## |\Z)", text, re.S)
+    assert calls, "the report no longer counts judge calls"
+    api = sum(int(m) for m in re.findall(r"\|\s*`\w+`\s*\|\s*(\d+)\s*\|", calls.group(1)))
+
+    if api:
+        assert not mode.startswith("offline"), (
+            f"the report says the judge was '{mode}' but records {api} API calls")
+    else:
+        assert mode.startswith("offline") or mode == "never ran", mode

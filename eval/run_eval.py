@@ -154,6 +154,29 @@ def band_sweep(cases):
     return out
 
 
+def _judge_mode(results):
+    """What the judge did, in the run that just happened."""
+    api = sum(r["judge_stats"]["api_calls"] for r in results.values())
+    off = sum(r["judge_stats"]["offline"] for r in results.values())
+    fail = sum(r["judge_stats"]["api_failures"] for r in results.values())
+    if api and not off:
+        return "api"
+    if api and off:
+        return f"mixed ({api} api, {off} offline, {fail} failed)"
+    if off:
+        return "offline"
+    return "never ran"
+
+
+def _judge_model():
+    from controlplane.tiers import tier2_judge
+    provider = tier2_judge._provider()
+    if not (provider and tier2_judge._api_key(provider)):
+        return None
+    cfg = ControlPlane().policies["decision_support"].tiers["tier2"]
+    return f"{provider}/{tier2_judge._model_for(cfg, provider)}"
+
+
 def pct(x):
     return f"{100 * x:.1f}%"
 
@@ -165,7 +188,8 @@ def write_report(results, sweep_rows, band_rows, cases, meta):
     L.append(f"Generated {meta['generated']}  \n")
     L.append(f"Dataset: `{DATASET.name}`, {len(cases)} cases  \n")
     L.append(f"Tier 1 grounding mode: **{meta['tier1_mode']}**  \n")
-    L.append(f"Tier 2 judge: **{meta['judge_mode']}**  \n")
+    L.append(f"Tier 2 judge: **{meta['judge_mode']}**"
+             + (f" — {meta['judge_model']}" if meta.get("judge_model") else "") + "  \n")
     L.append(f"Upstream priced as: **{UPSTREAM_MODEL}** — the cost column is a "
              f"percentage of this, so it moves if the application runs a "
              f"different model.\n")
@@ -291,7 +315,7 @@ def write_report(results, sweep_rows, band_rows, cases, meta):
     else:
         L.append(f"- Tier 1 grounding ran on **{meta['tier1_model']}** "
                  f"(`{meta['tier1_mode']}`) on {meta['device']}.\n")
-    if meta["judge_mode"] == "offline":
+    if meta["judge_mode"].startswith("offline"):
         L.append("- Tier 2 ran its **offline** judge, not a model. The offline judge "
                  "reasons about numeric and polarity contradiction only.\n")
         L.append("- `judge_everything` is therefore not an upper bound on quality. "
@@ -306,6 +330,15 @@ def write_report(results, sweep_rows, band_rows, cases, meta):
         L.append("- No safety model is loaded, so safety recall is 0 by "
                  "construction. The safety cases are in the set to keep that "
                  "gap visible rather than hidden.\n")
+    if meta["judge_mode"] == "api":
+        L.append(f"- Tier 2 ran a **live judge** ({meta.get('judge_model')}), "
+                 "with no fallbacks — see the judge-call table. So the ordering "
+                 "against `judge_everything` is a real result, not an artefact "
+                 "of a weak stand-in: sending every response to the same judge "
+                 "scored the same catch rate with double the false positives. "
+                 "It is one judge on one synthetic set, which is the limit worth "
+                 "stating; it is not a caveat that the comparison was unfair.\n")
+
     L.append("- `multi_hop` cases fail by construction. Each claim is scored "
              "against each chunk separately, which is what keeps faithful "
              "paraphrase from being flagged, but a claim that is true only by "
@@ -368,16 +401,28 @@ def main():
         "tier1_mode": described["mode"],
         "tier1_model": described["model"],
         "device": described["device"],
-        "judge_mode": "api" if (os.getenv("ANTHROPIC_API_KEY") or os.getenv("CP_API_KEY")) else "offline",
+        # Derived from what the judge actually did, not from which env var is
+        # set. The env-var version checked only Anthropic keys, so a run driven
+        # by an OpenAI key reported "offline" while making 328 live calls - and
+        # then attached caveats about the offline judge that were not true.
+        "judge_mode": _judge_mode(results),
+        "judge_model": _judge_model(),
         "safety_model": described["safety"],
         "budgets": {n: p.latency_budget_ms for n, p in ControlPlane().policies.items()},
     }
 
     RESULTS.mkdir(parents=True, exist_ok=True)
     (RESULTS / "summary.json").write_text(json.dumps(
+        # Everything write_report() needs, so a metadata mistake can be
+        # corrected without paying for the run again. The first version omitted
+        # per_kind and the judge counters, so a wrong header meant a re-run.
         {"meta": meta | {"safety_model": bool(meta["safety_model"])},
          "configs": {k: v["summary"] for k, v in results.items()},
          "per_category": {k: v["per_category"] for k, v in results.items()},
+         "per_kind": {k: v["per_kind"] for k, v in results.items()},
+         "judge_stats": {k: v["judge_stats"] for k, v in results.items()},
+         "chain_ok": {k: v["chain_ok"] for k, v in results.items()},
+         "rows": {k: v["rows"] for k, v in results.items()},
          "sweep": sweep_rows,
          "band_sweep": band_rows}, indent=2))
     write_report(results, sweep_rows, band_rows, cases, meta)
