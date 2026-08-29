@@ -32,7 +32,7 @@ Other entry points:
     python3 demo/run_feedback.py            # reviews retuning thresholds
     uvicorn controlplane.proxy.gateway:app  # gateway + dashboard
     python3 eval/run_eval.py                # the full benchmark, ~45 min with a key
-    pytest tests/                           # 57 tests, no network
+    pytest tests/                           # 58 tests, no network
 
 ## What it does
 
@@ -60,16 +60,16 @@ log.
 | config | catch | false positives | tier 2 rate | p95 | cost |
 |---|---|---|---|---|---|
 | rules only | 22.8% | 0.0% | 0% | 0.01 ms | Rs 0 |
-| rules + classifiers | 93.5% | 7.4% | 0% | 163 ms | Rs 0.39 |
-| **the cascade** | **94.6%** | **7.4%** | **2.8%** | **184 ms** | **Rs 1.13** |
-| a judge on every response | 94.6% | 15.6% | 100% | 4071 ms | Rs 30.14 |
+| rules + classifiers | 93.5% | 7.4% | 0% | 140 ms | Rs 0.35 |
+| **the cascade** | **94.6%** | **7.4%** | **2.8%** | **175 ms** | **Rs 1.10** |
+| a judge on every response | 92.4% | 14.8% | 100% | 5534 ms | Rs 30.01 |
 
-**The cascade reaches the same catch rate as judging everything, at 3.8% of the
-cost, with half the false positives and 22× lower latency.** That is the whole
-argument, and it is measured rather than asserted.
+**The cascade catches more than judging everything — 94.6% against 92.4% — at
+3.7% of the cost, with half the false positives and 32× lower latency.** That is
+the whole argument, and it is measured against a live judge rather than asserted.
 
 The report also states what the system cannot do — multi-hop grounding at 3 of 9,
-quantifier flips at 8 of 15, one policy over its own latency budget. Those are in
+quantifier flips at 8 of 15, two policies over their own latency budgets. Those are in
 `docs/tasks.md` under known gaps.
 
 ## Why a policy layer

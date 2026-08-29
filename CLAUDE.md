@@ -25,10 +25,11 @@ Working and measured: policy layer, tier 0 rules, tier 1 (NLI grounding +
 toxic-bert safety + bias heuristic), tier 2 judge (OpenAI verified live,
 Anthropic written but unrun), expected-cost router, cost meter, hash-chained
 audit, OpenAI-compatible gateway, streaming-concurrent verification, feedback
-loop, operator dashboard, 319-case benchmark, 57 tests.
+loop, operator dashboard, 319-case benchmark, 58 tests.
 
-Cascade: **94.6% catch, 7.4% false positives, Rs 1.13** against **Rs 30.14** for
-judging every response at the same catch rate.
+Cascade: **94.6% catch, 7.4% false positives, Rs 1.10** against **92.4% and
+Rs 30.01** for judging every response. Judge was live (openai/gpt-5.6-sol,
+1 of 328 calls fell back).
 
 Remaining: **the video**. Scripts are written: `docs/pitch_video.md` is the
 pitch, `docs/demo_video.md` the technical walkthrough. That is the only
@@ -81,9 +82,9 @@ Written down because each of these cost real time and would be repeated.
 - **Fallbacks must be counted.** A judge call that silently falls back to the
   offline judge turns an API result into a lexical one with no trace. The
   counter found 2 of 3 calls timing out on its first run.
-- **Selectivity beat volume.** Judging every response scored the same catch rate
-  with double the false positives and 27x the cost — a judge asked to re-rule on
+- **Selectivity beat volume.** Judging every response scored *lower* catch with
+  double the false positives and 27x the cost — a judge asked to re-rule on
   claims tier 1 already had right sometimes overrules them .
 - **The expensive thing is human review, not verification.** Verification is
-  Rs 5,537 a year at the brief's volume; one use case's review queue is
+  Rs 5,391 a year at the brief's volume; one use case's review queue is
   Rs 3.36 crore. That reframes what the product is for.

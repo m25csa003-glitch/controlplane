@@ -12,16 +12,16 @@ Round 2 implementation was carried out by Akshat Jain.
 | Tier 1 grounding | `cross-encoder/nli-deberta-v3-base` on MPS | catch 93.5% at 7.4% FP |
 | Tier 1 safety | `unitary/toxic-bert`, thresholds calibrated | separation 0.003 clean / 0.407 harmful |
 | Tier 1 bias | attribute x decision heuristic | `bias_decision` 94%, `bias_benign` 100% |
-| Tier 2 judge | OpenAI and Anthropic, structured output | 319 live calls, 0 failures |
+| Tier 2 judge | OpenAI and Anthropic, structured output | 327 live calls, 1 fallback |
 | Action router | expected cost, multi-label | `controlplane/router/router.py` |
-| Cost meter | verified prices, per-check attribution | cascade Rs 1.13 vs Rs 30.14 |
+| Cost meter | verified prices, per-check attribution | cascade Rs 1.10 vs Rs 30.01 |
 | Audit log | hash-chained, tamper-evident | `tests/test_pipeline.py` |
 | Gateway | OpenAI-compatible, mock and live | `docs/running.md` |
 | Streaming | verification beside the token stream | `demo/run_streaming.py` |
 | Feedback loop | reviews retune thresholds | `demo/run_feedback.py` |
 | Evaluation | 319 labelled cases, 4 configs, 2 sweeps | `eval/results/report.md` |
 | Dashboard | live SSE feed, four charts, queue, cost vs limits | `dashboard/index.html` |
-| Tests | 57, hermetic, no network | `pytest tests/` |
+| Tests | 58, hermetic, no network | `pytest tests/` |
 
 ## Known gaps, measured rather than hidden
 
@@ -31,8 +31,10 @@ Round 2 implementation was carried out by Akshat Jain.
 - **quantifier flips, 8 of 15 caught.** "up to X" against "at least X" is one
   word and the opposite meaning; the NLI model misses 47% of them.
 - **hedged but correct, 11 of 15.** Hedging reads as distance from the source.
-- **`internal_copilot` is over its own latency budget**, 1187ms p95 against
-  1000ms. Its uncertainty band is wide, so more responses reach the 1.3s judge.
+- **Two policies exceed their own latency budgets once the judge runs.**
+  `internal_copilot` 1225ms p95 against 1000ms; `decision_support` 3914ms
+  against 3000ms on the responses that reached tier 2. A judge call is seconds.
+  The clean path stays inside budget everywhere.
 - **`customer_support` runs over both its limits under live traffic** — 340ms
   p95 against a 300ms budget, and an escalation rate far above its 5% cap. The
   dashboard shows both in red. The cap is the more interesting of the two: it

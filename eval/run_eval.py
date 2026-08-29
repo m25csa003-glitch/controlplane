@@ -294,9 +294,15 @@ def write_report(results, sweep_rows, band_rows, cases, meta):
              "budget; it is only the escalated few percent that blow it.\n")
 
     L.append("\n## Judge calls\n")
-    L.append("A judge call that fails falls back to the offline judge silently. "
-             "If `failed` is not zero, the numbers above are a blend of two "
-             "different judges and should not be read as an API result.\n")
+    fell = meta.get("judge_fallbacks", 0)
+    total = meta.get("judge_total", 0)
+    L.append("A judge call that fails falls back to the offline judge silently, "
+             "so the fallbacks are counted. "
+             + ("Every call in this run reached the API.\n" if not fell else
+                f"{fell} of {total} calls ({fell/total:.1%}) fell back, so that "
+                "share of the grounding scores below came from the offline judge "
+                "rather than the model. Named because a silent fallback turns an "
+                "API result into a lexical one with no trace.\n"))
     L.append("\n| config | api calls | failed | offline |")
     L.append("|---|---|---|---|")
     for name, r in results.items():
@@ -330,12 +336,17 @@ def write_report(results, sweep_rows, band_rows, cases, meta):
         L.append("- No safety model is loaded, so safety recall is 0 by "
                  "construction. The safety cases are in the set to keep that "
                  "gap visible rather than hidden.\n")
-    if meta["judge_mode"] == "api":
+    if meta["judge_mode"].startswith(("api", "mixed")):
+        fell = meta.get("judge_fallbacks", 0)
+        total = meta.get("judge_total", 0)
+        detail = ("with no fallbacks" if not fell else
+                  f"with {fell} of {total} calls falling back to the offline judge "
+                  f"({fell/total:.1%})")
         L.append(f"- Tier 2 ran a **live judge** ({meta.get('judge_model')}), "
-                 "with no fallbacks — see the judge-call table. So the ordering "
+                 f"{detail} — see the judge-call table. So the ordering "
                  "against `judge_everything` is a real result, not an artefact "
                  "of a weak stand-in: sending every response to the same judge "
-                 "scored the same catch rate with double the false positives. "
+                 "scored worse on both catch rate and false positives. "
                  "It is one judge on one synthetic set, which is the limit worth "
                  "stating; it is not a caveat that the comparison was unfair.\n")
 
@@ -358,7 +369,43 @@ def write_report(results, sweep_rows, band_rows, cases, meta):
     (RESULTS / "report.md").write_text("\n".join(L) + "\n")
 
 
+def report_only():
+    """Rewrite the report from the last run's summary.json, without running it.
+
+    summary.json carries everything write_report needs. A wrong header or a
+    reworded caveat is then a text fix, not a dollar and forty-five minutes -
+    which is exactly what the last metadata mistake cost."""
+    path = RESULTS / "summary.json"
+    if not path.exists():
+        sys.exit("no summary.json; run the eval first")
+    d = json.loads(path.read_text())
+    if "rows" not in d:
+        sys.exit("summary.json predates --report-only; it has no per-row data")
+
+    results = {
+        name: {"summary": d["configs"][name],
+               "per_category": d["per_category"][name],
+               "per_kind": d["per_kind"][name],
+               "judge_stats": d["judge_stats"][name],
+               "chain_ok": d["chain_ok"][name],
+               "rows": d["rows"][name],
+               "n": d["configs"][name]["n"]}
+        for name in d["configs"]
+    }
+    meta = dict(d["meta"])
+    meta["judge_mode"] = _judge_mode(results)
+    meta["judge_fallbacks"] = sum(r["judge_stats"]["offline"] for r in results.values())
+    meta["judge_total"] = sum(r["judge_stats"]["api_calls"] + r["judge_stats"]["offline"]
+                              for r in results.values())
+    cases = load_cases()
+    write_report(results, d["sweep"], d["band_sweep"], cases, meta)
+    path.write_text(json.dumps({**d, "meta": meta}, indent=2))
+    print(f"rewrote {RESULTS / 'report.md'} from summary.json — no run, no spend")
+
+
 def main():
+    if "--report-only" in sys.argv:
+        return report_only()
     if "--lexical" in sys.argv:
         print("tier 1: lexical fallback (models not loaded)")
     else:
@@ -407,6 +454,9 @@ def main():
         # then attached caveats about the offline judge that were not true.
         "judge_mode": _judge_mode(results),
         "judge_model": _judge_model(),
+        "judge_fallbacks": sum(r["judge_stats"]["offline"] for r in results.values()),
+        "judge_total": sum(r["judge_stats"]["api_calls"] + r["judge_stats"]["offline"]
+                           for r in results.values()),
         "safety_model": described["safety"],
         "budgets": {n: p.latency_budget_ms for n, p in ControlPlane().policies.items()},
     }

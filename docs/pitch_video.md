@@ -92,16 +92,16 @@ loading models with nothing on screen. Film the finished output, not the wait.*
 
 *Screen: `localhost:8000/report#headline`*
 
-> Three hundred and nineteen labelled cases, live judge. Us against the obvious
-> way to do this — send **every** response to a judge.
+> Three hundred and nineteen labelled cases, a live judge model. Us against the
+> obvious way to do this — send **every** response to that same judge.
 
 | | catch | false positives | latency | cost |
 |---|---|---|---|---|
-| judge on everything | 94.6% | 15.6% | 4,071 ms | Rs 30.14 |
-| **the cascade** | **94.6%** | **7.4%** | **184 ms** | **Rs 1.13** |
+| judge on everything | 92.4% | 14.8% | 5,534 ms | Rs 30.01 |
+| **the cascade** | **94.6%** | **7.4%** | **175 ms** | **Rs 1.10** |
 
-> Same catch rate. **Half** the false positives. **Twenty-two times** faster.
-> Under **four percent** of the cost.
+> We catch **more** than it does. **Half** the false positives. **Thirty-two
+> times** faster. Under **four percent** of the cost.
 >
 > Checking everything with a big model doesn't buy accuracy. It buys a bill.
 
@@ -121,7 +121,7 @@ loading models with nothing on screen. Film the finished output, not the wait.*
 
 > Then the measurement changed how we think about the product.
 >
-> At the brief's volume, verification costs about **five and a half thousand
+> At the brief's volume, verification costs about **five thousand four hundred
 > rupees a year**. The human review it generates, for **one** use case, costs
 > **three point three six crore**.
 
@@ -174,7 +174,7 @@ video of the afternoon:
 
 - "one percent became two percent" — not "hallucination risk"
 - "three point three six crore" — not "significant cost savings"
-- "twenty-two times faster" — not "dramatically lower latency"
+- "thirty-two times faster" — not "dramatically lower latency"
 - "one line: the base URL" — not "seamless integration"
 - "config file, not a release" — not "highly configurable"
 - "nobody had to notice" — not "automated monitoring"

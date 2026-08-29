@@ -59,19 +59,36 @@ def test_no_document_quotes_a_stale_figure(kind):
                     f"report says {correct} of {n} for {kind}")
 
 
+def headline():
+    """{config: {column: cell}} from the report's headline table."""
+    section = REPORT.read_text().split("## Headline")[1].split("\n## ")[0]
+    lines = [l for l in section.splitlines() if l.strip().startswith("|")]
+    cols = [c.strip() for c in lines[0].strip("|").split("|")]
+    out = {}
+    for line in lines[2:]:
+        cells = [c.strip() for c in line.strip("|").split("|")]
+        out[cells[0].strip("`")] = dict(zip(cols[1:], cells[1:]))
+    return out
+
+
 def test_the_headline_numbers_are_quoted_as_published():
-    report = REPORT.read_text()
-    for figure in ("94.6%", "7.4%", "2.8%", "15.6%"):
-        assert figure in report, f"{figure} is no longer in the report"
+    """Hardcoding the figures here just moves the staleness into the test. Read
+    them out of the report and check the documents agree."""
+    head = headline()
+    casc, base = head["cascade"], head["judge_everything"]
     for name, text in docs().items():
-        if "94.6" in text:
-            assert "7.4" in text, f"{name} quotes the catch rate without the false positive rate"
+        if casc["catch rate"] not in text:
+            continue
+        # a document quoting the cascade's catch rate must quote its false
+        # positive rate too - the pair is the claim, the number alone is not
+        assert casc["false positive rate"] in text, (
+            f"{name} quotes catch {casc['catch rate']} without the false positive "
+            f"rate {casc['false positive rate']}")
+        assert base["catch rate"] in text or "judge" not in text.lower(), (
+            f"{name} compares against judge_everything without its catch rate "
+            f"{base['catch rate']}")
 
 
-@pytest.mark.xfail(reason="the committed report predates the judge-mode fix: its "
-                          "header says offline while its own call table records "
-                          "328 live calls. Regenerating it needs a re-run.",
-                   strict=False)
 def test_the_report_does_not_contradict_its_own_judge_counters():
     """The header said the judge was offline while the call table in the same
     document showed 328 live calls. The header was derived from which env var

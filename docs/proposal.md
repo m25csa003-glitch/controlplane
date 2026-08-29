@@ -127,17 +127,17 @@ and neither is a threshold a tuning script should move on its own.
 | Configuration | Catch rate | False positives | Tier 2 rate | p95 latency | Cost |
 |---|---|---|---|---|---|
 | Rules only | 22.8% | 0.0% | 0% | 0.01 ms | Rs 0 |
-| Rules + classifiers | 93.5% | 7.4% | 0% | 163 ms | Rs 0.39 |
-| **The cascade** | **94.6%** | **7.4%** | **2.8%** | **184 ms** | **Rs 1.13** |
-| A judge on every response | 94.6% | 15.6% | 100% | 4071 ms | Rs 30.14 |
+| Rules + classifiers | 93.5% | 7.4% | 0% | 140 ms | Rs 0.35 |
+| **The cascade** | **94.6%** | **7.4%** | **2.8%** | **175 ms** | **Rs 1.10** |
+| A judge on every response | 92.4% | 14.8% | 100% | 5534 ms | Rs 30.01 |
 
-**The cascade reaches the same catch rate as judging every response, at 3.8% of
-the cost, with half the false positives and 22× lower latency.**
+**The cascade catches more than judging every response — 94.6% against 92.4% —
+at 3.7% of the cost, with half the false positives and 32× lower latency.**
 
-That the judge-everything baseline is *worse* on false positives is not a
-rhetorical win — it is because a judge asked to rule on claims tier 1 already
-had right sometimes overrules them. Selectivity is not only cheaper here, it is
-more accurate.
+That the judge-everything baseline is *worse* on both is not a rhetorical win.
+A judge asked to re-rule on claims tier 1 already had right sometimes overrules
+them, and it does so in both directions. Selectivity is not only cheaper here,
+it is more accurate — measured against a live judge, not a stand-in.
 
 ### What it cannot do
 
@@ -148,7 +148,7 @@ Stated because a benchmark that reports only its wins is a brochure.
 | Multi-hop claims | 3 of 9 | A claim true only by combining two sources entails neither alone |
 | Quantifier flips | 8 of 15 caught | "up to X" against "at least X" is one word and the opposite meaning |
 | Hedged but correct | 11 of 15 | Hedging reads as distance from the source |
-| `internal_copilot` latency | 1187 ms vs 1000 ms budget | Its band is wide, so more responses reach the 1.3 s judge |
+| Two policies over their own latency budget | `internal_copilot` 1225 ms vs 1000; `decision_support` 3914 ms vs 3000 when the judge runs | A judge call is seconds; a budget in hundreds of milliseconds cannot absorb one |
 
 The eval set is synthetic and was written by the same person who tuned the
 checker. An earlier version scored 100% on every case type, which is exactly
@@ -173,16 +173,16 @@ At the brief's reference volume of roughly 30,000 interactions a week —
 
 | | Per response | Per year |
 |---|---|---|
-| ControlPlane cascade | Rs 0.0035 | **Rs 5,537** |
-| A judge on every response | Rs 0.0945 | Rs 147,412 |
-| **Difference** | | **Rs 141,875** |
+| ControlPlane cascade | Rs 0.0035 | **Rs 5,391** |
+| A judge on every response | Rs 0.0941 | Rs 146,763 |
+| **Difference** | | **Rs 141,372** |
 
 ### The number that actually matters
 
 Verification is not the expensive part. **Human review is.** At the escalation
 rate `decision_support` currently runs, that one use case alone sends about
 168,000 responses a year to a reviewer — roughly **Rs 3.36 crore** in review
-labour, against Rs 5,537 of compute.
+labour, against Rs 5,391 of compute.
 
 This reframes what the product is for. ControlPlane is not primarily a way to
 buy cheap verification; it is a way to **control how much human review you have
@@ -199,9 +199,9 @@ for itself when:
 
 | Use case | It pays for itself at |
 |---|---|
-| `internal_copilot` | 1 harmful response in 16,000 |
-| `customer_support` | 1 harmful response in 107,000 |
-| `decision_support` | 1 harmful response in 13.3 million |
+| `internal_copilot` | 1 harmful response in 16,400 |
+| `customer_support` | 1 harmful response in 109,000 |
+| `decision_support` | 1 harmful response in 13.7 million |
 
 Published hallucination rates for retrieval-grounded assistants are orders of
 magnitude above any of these. The verification layer is not a cost decision.

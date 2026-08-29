@@ -1,12 +1,14 @@
 # ControlPlane evaluation
 
-Generated 2026-08-25 03:29  
+Generated 2026-08-30 01:26  
 
 Dataset: `controlplane_eval_v1.jsonl`, 319 cases  
 
 Tier 1 grounding mode: **nli**  
 
-Tier 2 judge: **offline**
+Tier 2 judge: **mixed (327 api, 1 offline, 1 failed)** — openai/gpt-5.6-sol  
+
+Upstream priced as: **gpt-5.6-terra** — the cost column is a percentage of this, so it moves if the application runs a different model.
 
 
 > Every case is synthetic and labelled by construction. Numbers describe this set only.
@@ -16,12 +18,12 @@ Tier 2 judge: **offline**
 
 | config | catch rate | false positive rate | precision | F1 | tier 2 rate | p95 latency | verify cost (total) | verify as % of LLM spend |
 |---|---|---|---|---|---|---|---|---|
-| `tier0_only` | 22.8% | 0.0% | 100.0% | 37.2% | 0.0% | 0.01 ms | Rs 0.0000 | 0.000% |
-| `tier1_no_judge` | 93.5% | 7.4% | 94.5% | 94.0% | 0.0% | 162.88 ms | Rs 0.3947 | 0.362% |
-| `cascade` | 94.6% | 7.4% | 94.6% | 94.6% | 2.8% | 183.97 ms | Rs 1.1322 | 1.038% |
-| `judge_everything` | 94.6% | 15.6% | 89.2% | 91.8% | 100.0% | 4071.18 ms | Rs 30.1440 | 27.640% |
+| `tier0_only` | 22.8% | 0.0% | 100.0% | 37.2% | 0.0% | 0.02 ms | Rs 0.0000 | 0.000% |
+| `tier1_no_judge` | 93.5% | 7.4% | 94.5% | 94.0% | 0.0% | 139.78 ms | Rs 0.3477 | 0.446% |
+| `cascade` | 94.6% | 7.4% | 94.6% | 94.6% | 2.8% | 174.87 ms | Rs 1.1023 | 1.413% |
+| `judge_everything` | 92.4% | 14.8% | 89.5% | 90.9% | 100.0% | 5534.46 ms | Rs 30.0111 | 38.456% |
 
-**Cascade costs 3.8% of judging everything**, at 94.6% catch rate against 94.6%. Tier 2 ran on 2.8% of responses.
+**Cascade costs 3.7% of judging everything**, at 94.6% catch rate against 92.4%. Tier 2 ran on 2.8% of responses.
 
 
 ## Where the errors are
@@ -68,12 +70,12 @@ true pos 174 · false pos 10 · false neg 10 · true neg 125
 
 ### `judge_everything`
 
-true pos 174 · false pos 21 · false neg 10 · true neg 114
+true pos 170 · false pos 20 · false neg 14 · true neg 115
 
 
 | category | labelled | recall | co-fires on unlabelled |
 |---|---|---|---|
-| grounding | 127 | 96.1% | 81 (42.2%) |
+| grounding | 127 | 96.9% | 80 (41.7%) |
 | pii | 30 | 100.0% | 0 (0.0%) |
 | acl | 12 | 100.0% | 0 (0.0%) |
 | bias | 18 | 88.9% | 0 (0.0%) |
@@ -133,14 +135,14 @@ Tier 1 alone, threshold swept. The brief asks for this tradeoff to be exposed ra
 
 | band | tier 2 rate | catch rate | false positive rate | verify cost |
 |---|---|---|---|---|
-| `[0.5, 0.5]` | 0.0% | 94.0% | 8.1% | Rs 0.54 |
-| `[0.4, 0.6]` | 0.3% | 94.0% | 8.1% | Rs 0.52 |
-| `[0.3, 0.7]` | 1.6% | 94.0% | 8.9% | Rs 1.31 |
-| `[0.25, 0.75]` | 2.5% | 94.6% | 8.1% | Rs 1.25 |
-| `[0.2, 0.8]` | 2.8% | 94.6% | 8.1% | Rs 1.18 |
-| `[0.1, 0.9]` | 4.4% | 94.0% | 8.1% | Rs 1.71 |
-| `[0.05, 0.95]` | 7.8% | 94.6% | 9.6% | Rs 3.55 |
-| `[0.0, 1.01]` | 95.0% | 77.7% | 17.0% | Rs 34.43 |
+| `[0.5, 0.5]` | 0.0% | 94.0% | 8.1% | Rs 0.40 |
+| `[0.4, 0.6]` | 0.3% | 94.0% | 8.1% | Rs 0.39 |
+| `[0.3, 0.7]` | 1.6% | 94.0% | 8.9% | Rs 1.16 |
+| `[0.25, 0.75]` | 2.5% | 94.6% | 8.1% | Rs 1.19 |
+| `[0.2, 0.8]` | 2.8% | 94.6% | 8.1% | Rs 1.14 |
+| `[0.1, 0.9]` | 4.4% | 94.0% | 8.1% | Rs 1.64 |
+| `[0.05, 0.95]` | 7.8% | 94.0% | 10.4% | Rs 3.51 |
+| `[0.0, 1.01]` | 95.0% | 77.2% | 16.3% | Rs 27.81 |
 
 ## Latency against the policy budget
 
@@ -149,16 +151,16 @@ Tier 1 alone, threshold swept. The brief asks for this tradeoff to be exposed ra
 
 | use case | budget | p95 measured | p95 when tier 2 ran | verdict |
 |---|---|---|---|---|
-| customer_support | 300 ms | 90 ms | n/a | within budget |
-| decision_support | 3000 ms | 194 ms | 2970 ms | within budget |
-| internal_copilot | 1000 ms | 1187 ms | 3396 ms | **over budget** |
+| customer_support | 300 ms | 88 ms | n/a | within budget |
+| decision_support | 3000 ms | 190 ms | 3914 ms | **over budget** |
+| internal_copilot | 1000 ms | 1225 ms | 3216 ms | **over budget** |
 
 A judge call is 1.3 s on the cheap model and 3.1 s on the strong one. No amount of tuning fits that inside a 300 ms customer-support budget. Tier 2 is therefore not an inline step for a latency-bound use case - it has to run beside the response or after it, which is what the streaming path has to solve. The clean path, where tier 2 does not run at all, stays inside budget; it is only the escalated few percent that blow it.
 
 
 ## Judge calls
 
-A judge call that fails falls back to the offline judge silently. If `failed` is not zero, the numbers above are a blend of two different judges and should not be read as an API result.
+A judge call that fails falls back to the offline judge silently, so the fallbacks are counted. 1 of 328 calls (0.3%) fell back, so that share of the grounding scores below came from the offline judge rather than the model. Named because a silent fallback turns an API result into a lexical one with no trace.
 
 
 | config | api calls | failed | offline |
@@ -166,7 +168,7 @@ A judge call that fails falls back to the offline judge silently. If `failed` is
 | `tier0_only` | 0 | 0 | 0 |
 | `tier1_no_judge` | 0 | 0 | 0 |
 | `cascade` | 9 | 0 | 0 |
-| `judge_everything` | 319 | 0 | 0 |
+| `judge_everything` | 318 | 1 | 1 |
 
 ## Audit chain
 
@@ -179,9 +181,7 @@ A judge call that fails falls back to the offline judge silently. If `failed` is
 
 - Tier 1 grounding ran on **cross-encoder/nli-deberta-v3-base** (`nli`) on mps.
 
-- Tier 2 ran its **offline** judge, not a model. The offline judge reasons about numeric and polarity contradiction only.
-
-- `judge_everything` is therefore not an upper bound on quality. Its catch rate is capped by the same offline judge, and it inherits that judge's habit of scoring paraphrase as unsupported - which is why its false positive rate is worse than the cascade's here. With a real judge behind a key, expect it to beat the cascade on catch rate and still cost roughly six times as much. The cost ratio is the durable finding; the quality ordering is not.
+- Tier 2 ran a **live judge** (openai/gpt-5.6-sol), with 1 of 328 calls falling back to the offline judge (0.3%) — see the judge-call table. So the ordering against `judge_everything` is a real result, not an artefact of a weak stand-in: sending every response to the same judge scored worse on both catch rate and false positives. It is one judge on one synthetic set, which is the limit worth stating; it is not a caveat that the comparison was unfair.
 
 - `multi_hop` cases fail by construction. Each claim is scored against each chunk separately, which is what keeps faithful paraphrase from being flagged, but a claim that is true only by combining two chunks matches neither one alone. A judge that sees all sources at once is the right place to fix this, which is an argument for widening the band on retrieval-heavy use cases.
 

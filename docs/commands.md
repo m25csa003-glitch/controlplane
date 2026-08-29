@@ -88,7 +88,7 @@ Other endpoints:
 
 | Command | What | Cost |
 |---|---|---|
-| `python3 -m pytest tests/ -q` | all 57, no network | free |
+| `python3 -m pytest tests/ -q` | all 58, no network | free |
 | `python3 -m pytest tests/ -v` | same, one line per test | free |
 | `python3 -m pytest tests/ -m live` | only the tests that need a real API | **~5 paise** |
 | `python3 -m pytest tests/test_streaming.py -q` | one file | free |
@@ -105,6 +105,7 @@ one. That is why the suite is free even with a key in `.env`.
 |---|---|---|
 | `python3 eval/build_dataset.py` | regenerate the 319-case set | free |
 | `python3 eval/run_eval.py --lexical` | full benchmark, no models, no API | free |
+| `python3 eval/run_eval.py --report-only` | rewrite the report from the last run's summary.json | free |
 | `python3 eval/run_eval.py` | **the real one** | **~$1, 45 min** |
 
 Results are already committed in `eval/results/report.md` and

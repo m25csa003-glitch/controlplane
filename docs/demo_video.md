@@ -72,12 +72,13 @@ Show the headline table:
 
 | config | catch | FP | tier 2 | p95 | cost |
 |---|---|---|---|---|---|
-| the cascade | 94.6% | 7.4% | 2.8% | 184 ms | Rs 1.13 |
-| judge on everything | 94.6% | 15.6% | 100% | 4071 ms | Rs 30.14 |
+| the cascade | 94.6% | 7.4% | 2.8% | 175 ms | Rs 1.10 |
+| judge on everything | 92.4% | 14.8% | 100% | 5534 ms | Rs 30.01 |
 
-> Same catch rate as judging every response, at under four percent of the cost,
-> half the false positives, twenty-two times faster. 319 labelled cases, live
-> judge, zero fallbacks.
+> Higher catch rate than judging every response — 94.6 against 92.4 — at under
+> four percent of the cost, half the false positives, thirty-two times faster.
+> 319 labelled cases against a live judge; one call in 328 fell back, and the
+> report says so.
 
 Then scroll to the weaknesses section:
 
