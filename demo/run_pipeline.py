@@ -52,6 +52,9 @@ def main():
         if provider and tier2_judge._api_key(provider) else "offline (no API key set)"
     print(f"tier 1: {tier1_classifiers.describe()}\njudge:  {judge}")
 
+    if "--compare" in sys.argv:
+        return compare(cp)
+
     for use_case in ["customer_support", "internal_copilot", "decision_support"]:
         policy = cp.policies[use_case]
         print(f"\n=== {use_case}  (policy {policy.version}, "
@@ -63,6 +66,31 @@ def main():
             print(f"  {name:22s} -> {v.action.value:12s} tiers={str(v.tiers_run):9s} "
                   f"[{cats:22s}] verify={v.verification_cost_inr * 100:.4f}p "
                   f"llm={v.llm_cost_inr * 100:.2f}p")
+
+    ok, bad = cp.audit.verify()
+    print(f"\naudit chain intact: {ok}" + ("" if ok else f" (broken at line {bad})"))
+
+
+def compare(cp):
+    """The same responses, pivoted: each case beside its three verdicts.
+
+    The default view groups by use case, which is right for reading. It puts the
+    three verdicts for one input nine lines apart, which is wrong for showing
+    someone that the policy is what changed."""
+    cases = ["customer_support", "internal_copilot", "decision_support"]
+    W = 18
+    costs = ["Rs {:,}".format(cp.policies[c].costs["cost_of_being_wrong"]) for c in cases]
+    print(f"  {'':22s} {''.join(c.replace('_',' ').ljust(W) for c in cases)}")
+    print(f"  {'being wrong costs':22s} {''.join(x.ljust(W) for x in costs)}\n")
+    for name, text, chunks, allowed in CASES:
+        verdicts = []
+        for uc in cases:
+            v = cp.verify(text, uc, retrieved_chunks=chunks, allowed_chunk_ids=allowed,
+                          usage=USAGE, model=UPSTREAM_MODEL, provider=UPSTREAM_PROVIDER)
+            verdicts.append(v.action.value)
+        mark = " " if len(set(verdicts)) == 1 else "*"
+        print(f"{mark} {name:22s} {''.join(a.ljust(W) for a in verdicts)}")
+    print("\n  * the policy changed the answer. Nothing in the code did.")
 
     ok, bad = cp.audit.verify()
     print(f"\naudit chain intact: {ok}" + ("" if ok else f" (broken at line {bad})"))

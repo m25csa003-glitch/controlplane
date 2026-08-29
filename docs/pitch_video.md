@@ -60,18 +60,23 @@ is not.*
 
 ### 0:18 – 0:50 · The same answer, three different verdicts
 
-*Screen: `python3 demo/run_pipeline.py --models`.*
+*Screen: the terminal, already showing the output of*
+`python3 demo/run_pipeline.py --models --compare`
+
+**Run it before you hit record.** It takes about ten seconds, seven of them
+loading models with nothing on screen. Film the finished output, not the wait.*
 
 > ControlPlane sits between the application and the model and checks every
 > response before it reaches anyone. Your app changes **one line** — the base
 > URL.
 
-*Point at three lines:*
+*Point at one row:*
 
 ```
-hallucinated number   customer_support  -> regenerate
-                      internal_copilot  -> annotate
-                      decision_support  -> escalate
+                       customer support  internal copilot  decision support
+  being wrong costs    Rs 400            Rs 60             Rs 50,000
+
+* hallucinated number  regenerate        annotate          escalate
 ```
 
 > Same sentence. Three answers.
@@ -190,6 +195,11 @@ watching.
   recording is under a rupee.
 - Do not run `eval/run_eval.py` on camera. Forty-five minutes and a dollar, and
   its output is already committed.
+- `run_pipeline.py` is not a server. It prints and exits. Run it before
+  recording; the seven seconds it spends loading models is dead air.
+- `--compare` pivots the demo so one input's three verdicts sit on one row. The
+  default view groups by use case, which reads better but puts those three
+  lines nine apart - wrong for showing that the policy is what changed.
 - One take per section, cut between. A three-minute unbroken take will have you
   rushing the 1:05 block, which is the one that has to land.
 
