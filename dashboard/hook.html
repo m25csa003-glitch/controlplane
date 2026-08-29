@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ControlPlane — opening</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* The first fifteen seconds of the pitch. Two lines, nothing else - press any
+   key to advance through the beats so the recording stays in one take. */
+:root{
+  --ground:#F7F8FA; --ink:#16202B; --muted:#5C6B7A; --rule:#DCE2E8;
+  --good:#2F7D5D; --bad:#A9392C;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --ground:#0E1519; --ink:#E7EDF1; --muted:#8FA0AD; --rule:#26333F;
+  --good:#5EB98D; --bad:#E0796A;
+}}
+:root[data-theme="dark"]{
+  --ground:#0E1519; --ink:#E7EDF1; --muted:#8FA0AD; --rule:#26333F;
+  --good:#5EB98D; --bad:#E0796A;
+}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:var(--ground);color:var(--ink);
+  font-family:"IBM Plex Mono",ui-monospace,monospace;
+  display:flex;align-items:center;justify-content:center;padding:6vh 7vw;cursor:none}
+.stage{max-width:60ch;width:100%}
+.line{font-family:Archivo,system-ui,sans-serif;font-size:clamp(22px,3.6vw,40px);
+  line-height:1.32;letter-spacing:-.02em;margin:0 0 26px;text-wrap:balance;
+  opacity:0;transform:translateY(8px);transition:opacity .5s ease,transform .5s ease}
+.line.on{opacity:1;transform:none}
+.tag{font-family:"IBM Plex Mono",monospace;font-size:12px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--muted);display:block;margin-bottom:9px}
+em{font-style:normal;font-weight:700}
+.src em{color:var(--good)} .out em{color:var(--bad)}
+.beat{font-family:"IBM Plex Mono",monospace;font-size:clamp(13px,1.5vw,17px);
+  color:var(--muted);line-height:1.6;margin:34px 0 0;padding-top:24px;
+  border-top:1px solid var(--rule);max-width:52ch;
+  opacity:0;transition:opacity .5s ease}
+.beat.on{opacity:1}
+.beat b{color:var(--ink);font-weight:500}
+.hint{position:fixed;bottom:16px;right:20px;font-size:10.5px;color:var(--rule)}
+@media (prefers-reduced-motion:reduce){.line,.beat{transition:none}}
+</style>
+</head>
+<body>
+<div class="stage">
+  <p class="line src" id="l1"><span class="tag">the policy document</span>
+    Room rent is capped at <em>1 percent</em> of sum insured per day.</p>
+  <p class="line out" id="l2"><span class="tag">what the assistant told the customer</span>
+    Room rent capping is <em>2 percent</em>, so 185,000 rupees will be reimbursed.</p>
+  <p class="beat" id="b1">The model answered in <b>two seconds</b>.<br>
+    The review reached the enterprise <b>two weeks later</b>, as a complaint.</p>
+</div>
+<div class="hint" id="hint">space / click</div>
+<script>
+// Beats advance on space or click, so the take is driven by the voice rather
+// than by a timer that will not match it.
+const steps = ["l1", "l2", "b1"];
+let i = -1;
+function next(){
+  i++;
+  if (i < steps.length) document.getElementById(steps[i]).classList.add("on");
+  if (i >= steps.length - 1) document.getElementById("hint").style.display = "none";
+}
+addEventListener("keydown", e => { if (e.code === "Space" || e.key === "Enter") { e.preventDefault(); next(); } });
+addEventListener("click", next);
+next();
+</script>
+</body>
+</html>

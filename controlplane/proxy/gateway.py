@@ -8,7 +8,8 @@ from pathlib import Path
 
 import httpx
 from fastapi import FastAPI, Request, Header
-from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi.responses import (FileResponse, HTMLResponse, JSONResponse,
+                               StreamingResponse)
 
 from ..cost.meter import DEMO_UPSTREAM
 from ..pipeline import ControlPlane
@@ -60,6 +61,65 @@ def health():
 @app.get("/dashboard")
 def dashboard():
     return FileResponse(DASHBOARD)
+
+
+@app.get("/hook")
+def hook():
+    """The pitch video's opening screen. Served from the gateway so the whole
+    recording lives on one origin and one port."""
+    return FileResponse(DASHBOARD.parent / "hook.html")
+
+
+@app.get("/report")
+def report():
+    """The benchmark, rendered. The pitch shows this twice - the headline table
+    and the weaknesses - and raw markdown on camera undersells both."""
+    md = (DASHBOARD.parents[1] / "eval" / "results" / "report.md")
+    if not md.exists():
+        return JSONResponse({"error": "no report; run eval/run_eval.py"}, status_code=404)
+    return HTMLResponse(_render_md(md.read_text()))
+
+
+def _render_md(md):
+    """Enough markdown for this one document: headings, tables, bold, code."""
+    import html as _h
+    out, rows = [], []
+
+    def flush():
+        if not rows:
+            return
+        head, body = rows[0], [r for r in rows[1:] if not set(r) <= set("-: ")]
+        cell = lambda c, tag: f"<{tag}>{_inline(c.strip())}</{tag}>"
+        out.append("<div class='sc'><table><thead><tr>"
+                   + "".join(cell(c, "th") for c in head) + "</tr></thead><tbody>"
+                   + "".join("<tr>" + "".join(cell(c, "td") for c in r) + "</tr>" for r in body)
+                   + "</tbody></table></div>")
+        rows.clear()
+
+    def _inline(s):
+        s = _h.escape(s)
+        for a, b in (("**", "strong"), ("`", "code")):
+            parts = s.split(a)
+            s = "".join(p if i % 2 == 0 else f"<{b}>{p}</{b}>" for i, p in enumerate(parts))
+        return s
+
+    for line in md.splitlines():
+        if line.strip().startswith("|"):
+            rows.append([c for c in line.strip().strip("|").split("|")])
+            continue
+        flush()
+        s = line.strip()
+        if s.startswith("#"):
+            n = len(s) - len(s.lstrip("#"))
+            out.append(f"<h{min(n,3)}>{_inline(s.lstrip('# '))}</h{min(n,3)}>")
+        elif s.startswith("- "):
+            out.append(f"<li>{_inline(s[2:])}</li>")
+        elif s.startswith(">"):
+            out.append(f"<blockquote>{_inline(s.lstrip('> '))}</blockquote>")
+        elif s:
+            out.append(f"<p>{_inline(s)}</p>")
+    flush()
+    return REPORT_SHELL.replace("{{body}}", "\n".join(out))
 
 
 @app.get("/dashboard/stats")
@@ -268,6 +328,48 @@ async def _call_upstream(body, extras=None, correction=None):
     parts = [b.get("text", "") for b in data.get("content", []) if b.get("type") == "text"]
     return "".join(parts), data.get("usage", {})
 
+
+
+REPORT_SHELL = """<!doctype html><html lang=en><head><meta charset=utf-8>
+<meta name=viewport content="width=device-width,initial-scale=1">
+<title>ControlPlane evaluation</title>
+<link rel=preconnect href="https://fonts.googleapis.com">
+<link rel=preconnect href="https://fonts.gstatic.com" crossorigin>
+<link rel=stylesheet href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+:root{--ground:#F7F8FA;--surface:#fff;--raised:#EEF1F5;--ink:#16202B;--body:#2E3C49;
+ --muted:#5C6B7A;--faint:#8A97A3;--rule:#DCE2E8;--strong:#C3CDD6;--accent:#0E7C86;--soft:#E2F1F2}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--ground:#0E1519;
+ --surface:#16202B;--raised:#1D2A36;--ink:#E7EDF1;--body:#C3CFD8;--muted:#8FA0AD;
+ --faint:#6B7B88;--rule:#26333F;--strong:#374654;--accent:#45B3BD;--soft:#123238}}
+:root[data-theme=dark]{--ground:#0E1519;--surface:#16202B;--raised:#1D2A36;--ink:#E7EDF1;
+ --body:#C3CFD8;--muted:#8FA0AD;--faint:#6B7B88;--rule:#26333F;--strong:#374654;
+ --accent:#45B3BD;--soft:#123238}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--body);
+ font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:14px;line-height:1.6}
+.w{max-width:900px;margin:0 auto;padding:36px 24px 80px}
+h1{font-family:Archivo,system-ui,sans-serif;font-size:28px;font-weight:700;color:var(--ink);
+ letter-spacing:-.02em;margin:0 0 18px;padding-bottom:14px;border-bottom:2px solid var(--ink)}
+h2{font-family:Archivo,system-ui,sans-serif;font-size:17px;font-weight:600;color:var(--ink);
+ margin:38px 0 12px;padding-top:16px;border-top:1px solid var(--strong)}
+h3{font-family:Archivo,system-ui,sans-serif;font-size:14px;font-weight:600;color:var(--ink);margin:24px 0 8px}
+p{margin:0 0 12px;max-width:74ch}
+li{margin:0 0 8px;max-width:74ch;margin-left:20px}
+blockquote{margin:14px 0;padding:10px 16px;border-left:3px solid var(--accent);
+ background:var(--surface);color:var(--muted);border-radius:0 4px 4px 0}
+strong{color:var(--ink);font-weight:600}
+code{background:var(--raised);padding:1px 5px;border-radius:3px;font-size:13px}
+.sc{overflow-x:auto;margin:0 0 20px;border:1px solid var(--rule);border-radius:5px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th{text-align:left;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;
+ color:var(--muted);padding:10px 14px;background:var(--raised);
+ border-bottom:1px solid var(--strong);white-space:nowrap}
+td{padding:10px 14px;border-bottom:1px solid var(--rule);font-variant-numeric:tabular-nums;
+ vertical-align:top}
+tr:last-child td{border-bottom:none}
+tr:has(strong) td{background:var(--soft)}
+</style></head><body><div class=w>{{body}}</div></body></html>"""
 
 MOCK_REPLIES = {
     "room rent": "Room rent capping is 2 percent, so approximately 185000 rupees will be reimbursed.",
