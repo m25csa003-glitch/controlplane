@@ -339,8 +339,8 @@ async def _call_upstream(body, extras=None, correction=None):
 # Fixed to the corner so a jump is one click mid-take rather than a scroll.
 REPORT_NAV = ("<nav class=jump>"
               "<a href='#headline'>headline</a>"
-              "<a href='#reading-this-honestly'>what it gets wrong</a>"
-              "<a href='#by-case-type-cascade'>by case type</a>"
+              "<a href='#by-case-type-cascade'>what it gets wrong</a>"
+              "<a href='#reading-this-honestly'>caveats</a>"
               "<a href='#latency-against-the-policy-budget'>latency</a>"
               "</nav>")
 

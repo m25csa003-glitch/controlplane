@@ -138,15 +138,16 @@ of the measurement, and almost no one else will say it.*
 
 ### 2:05 – 2:25 · What it can't do
 
-*Screen: `localhost:8000/report#reading-this-honestly`*
+*Screen: `localhost:8000/report#by-case-type-cascade`*
 
-*The jump links in the corner get there in one click. Do not scroll for it
-on camera.*
+*The rate column is what it got **right**, so quantifier_flip at 53% means it
+misses nearly half. The jump links in the corner get there in one click —
+do not scroll for it on camera.*
 
 > And here is what it gets wrong.
 >
-> Claims that need two sources: four of nine. Quantifier flips — "up to" against
-> "at least" — it misses **forty-seven percent**.
+> Claims that need two sources: it gets **three of nine**. Quantifier flips —
+> "up to" against "at least" — it catches eight of fifteen.
 >
 > We wrote this test set. An earlier version scored a hundred percent on
 > everything, which is exactly why the hard cases exist.

@@ -70,7 +70,7 @@ statement. Anything here is a design decision we made, not a measured fact.
   retrieved text supports the claim. If retrieval returned the wrong chunk, or
   a stale one, a confidently wrong answer can still be scored as grounded. We
   check the answer against the sources, not the sources against the world.
-- **Multi-hop claims are the known weak point**, 4 of 9 on the eval set.
+- **Multi-hop claims are the known weak point**, 3 of 9 on the eval set.
 - **The eval set is synthetic and was written by the same person who tuned the
   checker.** An earlier version of it scored 100% on every case type, which is
   why the adversarial cases exist. It is a floor on difficulty, not a ceiling

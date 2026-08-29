@@ -21,15 +21,16 @@ Round 2 implementation was carried out by Akshat Jain.
 | Feedback loop | reviews retune thresholds | `demo/run_feedback.py` |
 | Evaluation | 319 labelled cases, 4 configs, 2 sweeps | `eval/results/report.md` |
 | Dashboard | live SSE feed, four charts, queue, cost vs limits | `dashboard/index.html` |
-| Tests | 52, hermetic, no network | `pytest tests/` |
+| Tests | 57, hermetic, no network | `pytest tests/` |
 
 ## Known gaps, measured rather than hidden
 
-- **multi-hop grounding, 4/9.** A claim true only by combining two chunks
+- **multi-hop grounding, 3 of 9.** A claim true only by combining two chunks
   entails neither alone. The joined premise recovers some of it and doubles
   tier 1 latency, so it is a policy switch, not a default.
-- **quantifier flips, 47%.** "up to X" against "at least X" is one word and the
-  opposite meaning; the NLI model often misses it.
+- **quantifier flips, 8 of 15 caught.** "up to X" against "at least X" is one
+  word and the opposite meaning; the NLI model misses 47% of them.
+- **hedged but correct, 11 of 15.** Hedging reads as distance from the source.
 - **`internal_copilot` is over its own latency budget**, 1187ms p95 against
   1000ms. Its uncertainty band is wide, so more responses reach the 1.3s judge.
 - **`customer_support` runs over both its limits under live traffic** — 340ms

@@ -81,8 +81,8 @@ Show the headline table:
 
 Then scroll to the weaknesses section:
 
-> And here is what it cannot do. Multi-hop claims, four of nine. Quantifier
-> flips, forty-seven percent. One policy is over its own latency budget. We
+> And here is what it cannot do. Multi-hop claims, three of nine. Quantifier
+> flips, eight of fifteen. One policy is over its own latency budget. We
 > wrote this test set ourselves — an earlier version scored a hundred percent on
 > everything, which is why the adversarial cases exist.
 

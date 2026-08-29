@@ -145,9 +145,9 @@ Stated because a benchmark that reports only its wins is a brochure.
 
 | Weakness | Rate | Why |
 |---|---|---|
-| Multi-hop claims | 4 of 9 | A claim true only by combining two sources entails neither alone |
-| Quantifier flips | 47% | "up to X" against "at least X" is one word and the opposite meaning |
-| Hedged but correct | 67% | Hedging reads as distance from the source |
+| Multi-hop claims | 3 of 9 | A claim true only by combining two sources entails neither alone |
+| Quantifier flips | 8 of 15 caught | "up to X" against "at least X" is one word and the opposite meaning |
+| Hedged but correct | 11 of 15 | Hedging reads as distance from the source |
 | `internal_copilot` latency | 1187 ms vs 1000 ms budget | Its band is wide, so more responses reach the 1.3 s judge |
 
 The eval set is synthetic and was written by the same person who tuned the

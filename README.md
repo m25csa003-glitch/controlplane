@@ -32,7 +32,7 @@ Other entry points:
     python3 demo/run_feedback.py            # reviews retuning thresholds
     uvicorn controlplane.proxy.gateway:app  # gateway + dashboard
     python3 eval/run_eval.py                # the full benchmark, ~45 min with a key
-    pytest tests/                           # 52 tests, no network
+    pytest tests/                           # 57 tests, no network
 
 ## What it does
 
@@ -68,8 +68,8 @@ log.
 cost, with half the false positives and 22× lower latency.** That is the whole
 argument, and it is measured rather than asserted.
 
-The report also states what the system cannot do — multi-hop grounding at 4/9,
-quantifier flips at 47%, one policy over its own latency budget. Those are in
+The report also states what the system cannot do — multi-hop grounding at 3 of 9,
+quantifier flips at 8 of 15, one policy over its own latency budget. Those are in
 `docs/tasks.md` under known gaps.
 
 ## Why a policy layer

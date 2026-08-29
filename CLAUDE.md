@@ -25,7 +25,7 @@ Working and measured: policy layer, tier 0 rules, tier 1 (NLI grounding +
 toxic-bert safety + bias heuristic), tier 2 judge (OpenAI verified live,
 Anthropic written but unrun), expected-cost router, cost meter, hash-chained
 audit, OpenAI-compatible gateway, streaming-concurrent verification, feedback
-loop, operator dashboard, 319-case benchmark, 52 tests.
+loop, operator dashboard, 319-case benchmark, 57 tests.
 
 Cascade: **94.6% catch, 7.4% false positives, Rs 1.13** against **Rs 30.14** for
 judging every response at the same catch rate.
@@ -34,8 +34,8 @@ Remaining: **the video**. Scripts are written: `docs/pitch_video.md` is the
 pitch, `docs/demo_video.md` the technical walkthrough. That is the only
 outstanding deliverable.
 
-Known open items, all recorded in `docs/tasks.md`: multi-hop grounding is 4/9,
-quantifier flips 47%, `internal_copilot` and `customer_support` run over limits
+Known open items, all recorded in `docs/tasks.md`: multi-hop grounding is 3 of 9,
+quantifier flips 8 of 15, `internal_copilot` and `customer_support` run over limits
 they set for themselves, and multi-turn risk accumulation is not built at all.
 
 ## How to verify a change
@@ -75,8 +75,8 @@ Written down because each of these cost real time and would be repeated.
   itself.
 - **A benchmark that scores 100% is broken, not finished.** The first eval set
   did. `eval/corpus_hard.py` exists because of that.
-- **Report what the system cannot do.** The eval names multi-hop at 4/9 and
-  quantifier flips at 47%. Judges and reviewers trust a published weakness more
+- **Report what the system cannot do.** The eval names multi-hop at 3 of 9 and
+  quantifier flips at 8 of 15. Judges and reviewers trust a published weakness more
   than an unpublished strength.
 - **Fallbacks must be counted.** A judge call that silently falls back to the
   offline judge turns an API result into a lexical one with no trace. The

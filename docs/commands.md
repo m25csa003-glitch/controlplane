@@ -88,7 +88,7 @@ Other endpoints:
 
 | Command | What | Cost |
 |---|---|---|
-| `python3 -m pytest tests/ -q` | all 52, no network | free |
+| `python3 -m pytest tests/ -q` | all 57, no network | free |
 | `python3 -m pytest tests/ -v` | same, one line per test | free |
 | `python3 -m pytest tests/ -m live` | only the tests that need a real API | **~5 paise** |
 | `python3 -m pytest tests/test_streaming.py -q` | one file | free |
