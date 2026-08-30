@@ -153,6 +153,35 @@ Outputs land beside their builders:
 
 ---
 
+## Pointing it at a real provider
+
+The gateway defaults to a mock upstream so the demo runs with no key. To put a
+real model behind it:
+
+    CP_UPSTREAM=openai CP_API_KEY=sk-... uvicorn controlplane.proxy.gateway:app --port 8000
+
+`CP_UPSTREAM` takes `mock`, `openai` or `anthropic`. The gateway is
+OpenAI-compatible either way, so an existing client only changes its base URL:
+
+    curl localhost:8000/v1/chat/completions \
+      -H 'Content-Type: application/json' \
+      -H 'X-ControlPlane-Use-Case: customer_support' \
+      -d '{"model":"gpt-4o-mini","messages":[{"role":"user","content":"room rent?"}],
+           "controlplane":{"retrieved_chunks":[{"id":"pol-1","text":"Room rent capping is 1 percent."}]}}'
+
+The response carries a `controlplane` block with the verdict, which tiers ran,
+what each check cost and why the action was chosen. Add `"stream": true` and the
+same verification runs beside the token stream.
+
+## Checking the audit chain
+
+    curl localhost:8000/audit/verify
+
+Returns `{"chain_intact": true}` or the line number where the chain breaks. Every
+verdict and every human override is in it.
+
+---
+
 ## Recording the demo video
 
 The order in `docs/demo_video.md`, with costs:

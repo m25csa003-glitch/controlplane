@@ -19,3 +19,6 @@ demo/feedback.jsonl
 
 # Gateway run artefact.
 audit.jsonl
+
+# Office lock files, left behind while a deck is open.
+~$*

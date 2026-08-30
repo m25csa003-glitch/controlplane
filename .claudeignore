@@ -1,8 +1,0 @@
-.venv/
-__pycache__/
-*.pyc
-.env
-audit.jsonl
-eval/datasets/
-eval/results/
-dashboard/node_modules/
