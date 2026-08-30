@@ -15,3 +15,8 @@ onnxruntime
 presidio-analyzer
 presidio-anonymizer
 pytest
+
+# Build the submission deliverables only (docs/build_deck.py, build_pdf.py).
+# Not needed to run the verification layer.
+python-pptx
+reportlab

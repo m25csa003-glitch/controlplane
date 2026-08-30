@@ -75,7 +75,7 @@ multi-turn risk accumulation.
 
 ## Remaining before submission
 
-- [x] Business proposal document — `docs/proposal.md`
+- [x] Business proposal — `docs/proposal.md`, PDF and PPT built from it
 - [x] README rewrite
 - [x] Operator dashboard
 - [x] Public GitHub repository
