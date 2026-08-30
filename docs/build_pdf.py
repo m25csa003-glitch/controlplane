@@ -1,6 +1,7 @@
-"""Renders docs/proposal.md as the submission PDF.
+"""Renders a markdown document as a PDF.
 
-    python3 docs/build_pdf.py
+    python3 docs/build_pdf.py                 # the business proposal
+    python3 docs/build_pdf.py README.md       # or any other document
 
 Generated from the markdown rather than laid out by hand, so a corrected figure
 reaches the PDF by re-running this instead of by someone remembering to.
@@ -15,12 +16,16 @@ from reportlab.lib.enums import TA_LEFT
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
-from reportlab.platypus import (BaseDocTemplate, Frame, KeepTogether, PageBreak,
-                                PageTemplate, Paragraph, Spacer, Table, TableStyle)
+from reportlab.platypus import (BaseDocTemplate, Frame, HRFlowable, PageTemplate,
+                                Paragraph, Spacer, Table, TableStyle)
 
 ROOT = Path(__file__).resolve().parents[1]
-SRC = ROOT / "docs" / "proposal.md"
-OUT = ROOT / "docs" / "ControlPlane_Business_Proposal.pdf"
+DOCS = {
+    "docs/proposal.md": ("ControlPlane_Business_Proposal.pdf",
+                         "ControlPlane · Business Proposal · Team Nexus, IIT Jodhpur"),
+    "README.md":        ("ControlPlane_README.pdf",
+                         "ControlPlane · Repository guide · Team Nexus, IIT Jodhpur"),
+}
 
 INK = colors.HexColor("#16202B")
 BODY = colors.HexColor("#333F4B")
@@ -62,11 +67,16 @@ S = {
 
 
 def inline(s):
-    """Bold, code and the handful of entities the source actually uses."""
+    """Bold, code, links and the handful of entities the sources actually use."""
     s = html.escape(s)
+    # links first: their label may itself contain code or bold
+    s = re.sub(r"\[([^\]]+)\]\(([^)]+)\)",
+               lambda m: f'<link href="{m.group(2)}" color="#0E7C86">{m.group(1)}</link>', s)
     s = re.sub(r"\*\*(.+?)\*\*", r'<font color="#16202B"><b>\1</b></font>', s)
     s = re.sub(r"`(.+?)`", r'<font face="Courier" size="8.5">\1</font>', s)
-    s = s.replace("—", "&#8212;").replace("×", "&#215;").replace("→", "&#8594;")
+    for a, b in (("—", "&#8212;"), ("×", "&#215;"), ("→", "&#8594;"),
+                 ("·", "&#183;"), ("–", "&#8211;")):
+        s = s.replace(a, b)
     return s
 
 
@@ -105,7 +115,11 @@ def build_table(rows, width):
 
 
 def parse(md, width):
-    flow, rows, code = [], [], []
+    """Markdown wraps a paragraph across lines; inline markup does not respect
+    that. Bold opened on one line and closed on the next left literal asterisks
+    in the output, so lines are joined into their paragraph before any inline
+    rule runs."""
+    flow, rows, code, para = [], [], [], []
 
     def flush_table():
         nonlocal rows
@@ -122,6 +136,19 @@ def parse(md, width):
             flow.append(Paragraph(body, S["code"]))
             code = []
 
+    def flush_para():
+        nonlocal para
+        if para:
+            text = " ".join(para)
+            style = "lede" if text.startswith("**Accenture") else "p"
+            if text.startswith("- "):
+                flow.append(Paragraph(inline(text[2:]), S["li"], bulletText="\u2022"))
+            elif text.startswith("*") and text.endswith("*") and "**" not in text:
+                flow.append(Paragraph(inline(text.strip("*")), S["quote"]))
+            else:
+                flow.append(Paragraph(inline(text), S[style]))
+            para = []
+
     in_code = False
     for line in md.splitlines():
         s = line.rstrip()
@@ -136,6 +163,7 @@ def parse(md, width):
             continue
 
         if s.strip().startswith("|"):
+            flush_para()
             cells = [c.strip() for c in s.strip().strip("|").split("|")]
             if not set("".join(cells)) <= set("-: "):
                 rows.append(cells)
@@ -144,29 +172,34 @@ def parse(md, width):
 
         t = s.strip()
         if not t:
+            flush_para()
             continue
         if t == "---":
-            continue
-        if t.startswith("### "):
+            flush_para()
+            flow.append(Spacer(1, 4))
+            flow.append(HRFlowable(width="100%", thickness=0.5, color=RULE,
+                                   spaceBefore=2, spaceAfter=9))
+        elif t.startswith("### "):
+            flush_para()
             flow.append(Paragraph(inline(t[4:]), S["h3"]))
         elif t.startswith("## "):
+            flush_para()
             flow.append(Paragraph(inline(t[3:]), S["h2"]))
         elif t.startswith("# "):
+            flush_para()
             flow.append(Paragraph(inline(t[2:]), S["h1"]))
-        elif t.startswith("**Accenture"):
-            flow.append(Paragraph(inline(t), S["lede"]))
         elif t.startswith("- "):
-            flow.append(Paragraph(inline(t[2:]), S["li"], bulletText="•"))
-        elif t.startswith("*") and t.endswith("*") and len(t) > 2:
-            flow.append(Paragraph(inline(t.strip("*")), S["quote"]))
+            flush_para()          # a new bullet ends the previous block
+            para.append(t)
         else:
-            flow.append(Paragraph(inline(t), S["p"]))
+            para.append(t)
+    flush_para()
     flush_table()
     flush_code()
     return flow
 
 
-def furniture(canvas, doc):
+def furniture(canvas, doc, heading=""):
     canvas.saveState()
     w, h = A4
     canvas.setStrokeColor(RULE)
@@ -174,8 +207,7 @@ def furniture(canvas, doc):
     canvas.line(MARGIN, h - TOP + 7 * mm, w - MARGIN, h - TOP + 7 * mm)
     canvas.setFont("Helvetica", 7)
     canvas.setFillColor(FAINT)
-    canvas.drawString(MARGIN, h - TOP + 9 * mm,
-                      "ControlPlane · Business Proposal · Team Nexus, IIT Jodhpur")
+    canvas.drawString(MARGIN, h - TOP + 9 * mm, heading)
     canvas.drawRightString(w - MARGIN, h - TOP + 9 * mm,
                            "Accenture Innovation Challenge 2026 · Round 2")
     canvas.line(MARGIN, BOT + 4 * mm, w - MARGIN, BOT + 4 * mm)
@@ -185,24 +217,31 @@ def furniture(canvas, doc):
     canvas.restoreState()
 
 
-def main():
-    if not SRC.exists():
-        sys.exit(f"missing {SRC}")
+def main(rel="docs/proposal.md"):
+    if rel not in DOCS:
+        sys.exit(f"no PDF recipe for {rel!r}; known: {', '.join(DOCS)}")
+    src = ROOT / rel
+    if not src.exists():
+        sys.exit(f"missing {src}")
+    out_name, heading = DOCS[rel]
+    out = ROOT / "docs" / out_name
     w, h = A4
     width = w - 2 * MARGIN
-    doc = BaseDocTemplate(str(OUT), pagesize=A4,
+    doc = BaseDocTemplate(str(out), pagesize=A4,
                           leftMargin=MARGIN, rightMargin=MARGIN,
                           topMargin=TOP, bottomMargin=BOT,
-                          title="ControlPlane — Business Proposal",
+                          title=heading.split(" · ")[1],
                           author="Team Nexus, IIT Jodhpur",
                           subject="Accenture Innovation Challenge 2026, Round 2")
     frame = Frame(MARGIN, BOT, width, h - TOP - BOT, id="body",
                   leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0)
-    doc.addPageTemplates([PageTemplate(id="main", frames=[frame], onPage=furniture)])
-    doc.build(parse(SRC.read_text(), width))
-    return OUT
+    doc.addPageTemplates([PageTemplate(
+        id="main", frames=[frame],
+        onPage=lambda c, d: furniture(c, d, heading))])
+    doc.build(parse(src.read_text(), width))
+    return out
 
 
 if __name__ == "__main__":
-    out = main()
+    out = main(sys.argv[1] if len(sys.argv) > 1 else "docs/proposal.md")
     print(f"wrote {out.relative_to(ROOT)}  ({out.stat().st_size // 1024} KB)")

@@ -141,7 +141,8 @@ Useful overrides:
 | Command | What | Cost |
 |---|---|---|
 | `python3 docs/build_deck.py` | the PPT, on the official AIC template | free |
-| `python3 docs/build_pdf.py` | the PDF, rendered from `docs/proposal.md` | free |
+| `python3 docs/build_pdf.py` | the proposal PDF, from `docs/proposal.md` | free |
+| `python3 docs/build_pdf.py README.md` | the README as a PDF | free |
 
 Both regenerate from source. Edit `docs/proposal.md` and re-run — do not edit the
 `.pptx` or `.pdf` by hand, or the next benchmark run silently leaves them stale.
@@ -150,6 +151,7 @@ Outputs land beside their builders:
 
     docs/ControlPlane_Business_Proposal.pptx
     docs/ControlPlane_Business_Proposal.pdf
+    docs/ControlPlane_README.pdf
 
 ---
 
