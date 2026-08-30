@@ -194,11 +194,22 @@ exactly that — the number the business itself budgeted for — one use case se
 **104,000 responses a year** to a reviewer: **Rs 2.08 crore** in labour, against
 **Rs 5,391** of compute for the whole estate. Nearly four thousand times.
 
-On our eval set it runs above that cap, at roughly 32%. We do not extrapolate
-that figure: the set is 57.7% harmful by construction, far more hostile than
-production traffic, so its escalation rate is not a forecast. The declared cap
-is the honest planning number, and the argument does not depend on which you
-pick — review labour dominates verification at any rate above a fraction of a
+On our eval set it runs above that cap. Measured with inverse-propensity
+weighting over the reviewed queue, `decision_support` escalates **31.7–32.3%**
+across runs — the range is the judge's non-determinism, not noise in the
+measurement. Held at that rate, the same use case sends about 165,000 responses
+a year to a reviewer: **a little over Rs 3.3 crore**.
+
+Both figures are real and they answer different questions. Rs 2.08 crore is what
+this policy budgeted for. Rs 3.3 crore is what it would actually spend if it
+kept escalating the way it does on our set — which is why the loop reports the
+overage instead of quietly moving the threshold.
+
+Neither is a forecast, and we do not present one. The eval set is 57.7% harmful
+by construction, far more hostile than production traffic, so its escalation
+rate is an upper bound on what real traffic would produce. The argument does not
+depend on which number you take: review labour dominates verification by three
+to four orders of magnitude at any escalation rate above a fraction of a
 percent.
 
 This reframes what the product is for. ControlPlane is not primarily a way to

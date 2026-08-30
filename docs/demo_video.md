@@ -116,9 +116,8 @@ human reviews are in the audit chain too: 614 entries
 
 ## 2:50 — Close (10s)
 
-> Verification costs about five thousand rupees a year at this volume. One use
-> case, reviewing the twenty percent it declared it can, costs two crore.
-> ControlPlane isn't a way to buy
+> Verification costs about five thousand rupees a year at this volume. Human
+> review of one use case costs over three crore. ControlPlane isn't a way to buy
 > cheap checking — it's a way to control how much review you have to buy, and
 > to justify every unit of it.
 

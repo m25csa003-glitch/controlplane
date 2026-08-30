@@ -122,10 +122,14 @@ loading models with nothing on screen. Film the finished output, not the wait.*
 > Then the measurement changed how we think about the product.
 >
 > At the brief's volume, verification costs about **five thousand four hundred
-> rupees a year**. One use case, reviewing the twenty percent it says it can,
-> costs **two crore eight**.
+> rupees a year**. The human review it generates, for **one** use case, costs
+> **over three crore**.
 
 *Beat. Let that sit.*
+
+*"Over three crore" is the safe phrasing: measured across runs the figure is
+Rs 3.30–3.36 crore, and the judge's non-determinism moves it. Do not say "three
+point six" — nothing measured supports it. "Three point three" is exact.*
 
 > Verification was never the expensive part. **Human attention is.**
 >
@@ -173,7 +177,7 @@ knows where its own edges are. Say it at normal pace — no apology in the voice
 video of the afternoon:
 
 - "one percent became two percent" — not "hallucination risk"
-- "two crore eight" — not "significant cost savings"
+- "over three crore" — not "significant cost savings"
 - "thirty-two times faster" — not "dramatically lower latency"
 - "one line: the base URL" — not "seamless integration"
 - "config file, not a release" — not "highly configurable"
