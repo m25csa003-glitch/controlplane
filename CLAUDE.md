@@ -31,9 +31,9 @@ Cascade: **94.6% catch, 7.4% false positives, Rs 1.10** against **92.4% and
 Rs 30.01** for judging every response. Judge was live (openai/gpt-5.6-sol,
 1 of 328 calls fell back).
 
-Remaining: **the video**. Scripts are written: `docs/pitch_video.md` is the
-pitch, `docs/demo_video.md` the technical walkthrough. That is the only
-outstanding deliverable.
+All four Round 2 deliverables are done: prototype, business proposal (PDF and
+PPT), public repository, and the demo video —
+https://drive.google.com/file/d/1S4paAjOKEdX4FT1KDydjQjpdF2UseLI1/view?usp=sharing
 
 Known open items, all recorded in `docs/tasks.md`: multi-hop grounding is 3 of 9,
 quantifier flips 8 of 15, `internal_copilot` and `customer_support` run over limits

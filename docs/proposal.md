@@ -286,5 +286,5 @@ decisions can answer.
 
 ---
 
-*Prototype, benchmark and results: the public repository. Every figure here is
-reproducible with `python3 eval/run_eval.py`.*
+*Prototype, benchmark and results: the public repository. Demo video: https://drive.google.com/file/d/1S4paAjOKEdX4FT1KDydjQjpdF2UseLI1/view?usp=sharing
+Every figure here is reproducible with `python3 eval/run_eval.py`.*

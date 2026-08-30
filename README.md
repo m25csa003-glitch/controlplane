@@ -12,7 +12,7 @@ policy of the use case the request came from.
 | Business proposal | [`docs/ControlPlane_Business_Proposal.pdf`](docs/ControlPlane_Business_Proposal.pdf) · [`.pptx`](docs/ControlPlane_Business_Proposal.pptx) |
 | Benchmark and results | [`eval/results/report.md`](eval/results/report.md) |
 | Prototype | this repository |
-| Demo video | *link to follow* |
+| Demo video | [Watch on Google Drive](https://drive.google.com/file/d/1S4paAjOKEdX4FT1KDydjQjpdF2UseLI1/view?usp=sharing) |
 
 ---
 

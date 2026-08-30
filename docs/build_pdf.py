@@ -20,6 +20,11 @@ from reportlab.platypus import (BaseDocTemplate, Frame, HRFlowable, PageTemplate
                                 Paragraph, Spacer, Table, TableStyle)
 
 ROOT = Path(__file__).resolve().parents[1]
+# A PDF travels on its own, so a link to "docs/tasks.md" resolves to nothing
+# once it leaves the repository. Relative targets are rewritten to the file on
+# GitHub, which is where a reader can actually follow them.
+REPO_BLOB = "https://github.com/m25csa003-glitch/controlplane/blob/main/"
+
 DOCS = {
     "docs/proposal.md": ("ControlPlane_Business_Proposal.pdf",
                          "ControlPlane · Business Proposal · Team Nexus, IIT Jodhpur"),
@@ -70,8 +75,13 @@ def inline(s):
     """Bold, code, links and the handful of entities the sources actually use."""
     s = html.escape(s)
     # links first: their label may itself contain code or bold
-    s = re.sub(r"\[([^\]]+)\]\(([^)]+)\)",
-               lambda m: f'<link href="{m.group(2)}" color="#0E7C86">{m.group(1)}</link>', s)
+    def link(m):
+        href = m.group(2)
+        if not href.startswith(("http://", "https://", "mailto:", "#")):
+            href = REPO_BLOB + href.lstrip("./")
+        return f'<link href="{href}" color="#0E7C86">{m.group(1)}</link>'
+
+    s = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", link, s)
     s = re.sub(r"\*\*(.+?)\*\*", r'<font color="#16202B"><b>\1</b></font>', s)
     s = re.sub(r"`(.+?)`", r'<font face="Courier" size="8.5">\1</font>', s)
     for a, b in (("—", "&#8212;"), ("×", "&#215;"), ("→", "&#8594;"),

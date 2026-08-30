@@ -21,6 +21,8 @@ from pptx.util import Inches, Pt
 ROOT = Path(__file__).resolve().parents[1]
 TEMPLATE = ROOT.parent / "Breif_PPT" / "AIC_Talent-Brand_PPT-Template (1).pptx"
 OUT = ROOT / "docs" / "ControlPlane_Business_Proposal.pptx"
+VIDEO = "https://drive.google.com/file/d/1S4paAjOKEdX4FT1KDydjQjpdF2UseLI1/view?usp=sharing"
+REPO = "https://github.com/m25csa003-glitch/controlplane"
 
 # Pulled from the template's own palette so the deck stays on-brand.
 INK = RGBColor(0x16, 0x20, 0x2B)
@@ -429,6 +431,20 @@ def build():
     ])
     note(s, "Prototype, benchmark and results: github.com/m25csa003-glitch/controlplane · "
             "Every figure reproducible with python3 eval/run_eval.py")
+
+    # 12 · the video ------------------------------------------------------
+    s = title_slide(prs, "See it running",
+                    "Three minutes: one response taking three verdicts, the benchmark, "
+                    "the live dashboard, and what the system gets wrong.")
+    textbox(s, 0.61, 2.2, 12.1, 3.0, [
+        ("Demo video", 12, ACCENT, True, 4),
+        (VIDEO, 12.5, INK, False, 18),
+        ("Repository, benchmark and full results", 12, ACCENT, True, 4),
+        (REPO, 12.5, INK, False, 18),
+        ("Every figure in this deck is reproducible with python3 eval/run_eval.py, "
+         "and eval/results/report.md carries the run that produced them — including "
+         "the cases the system gets wrong.", 11.5, MUTED, False, 0),
+    ])
 
     salutation(prs)
     prs.save(str(OUT))
