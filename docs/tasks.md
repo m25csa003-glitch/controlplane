@@ -89,3 +89,30 @@ multi-turn risk accumulation.
 - Everything degrades gracefully with no key and no models. That is what makes
   the demo runnable on a fresh clone.
 - No API keys in code. `.env` is gitignored and stays that way.
+
+## What this project learned the hard way
+
+Written down because each of these cost real time and would otherwise be
+repeated.
+
+- **A number without provenance is a liability.** Cost lines carry
+  `measured` / `reported` / `modelled` / `estimated`. An early guess at judge
+  output tokens was wrong by 5x, which made modelled cost read 19x the billed
+  one and produced a confidently wrong conclusion about whether tier 2 pays for
+  itself.
+- **A benchmark that scores 100% is broken, not finished.** The first eval set
+  did. `eval/corpus_hard.py` exists because of that.
+- **Report what the system cannot do.** The eval names multi-hop at 3 of 9 and
+  quantifier flips at 8 of 15. Reviewers trust a published weakness more than an
+  unpublished strength.
+- **Fallbacks must be counted.** A judge call that silently falls back turns an
+  API result into a lexical one with no trace. The counter found 2 of 3 calls
+  timing out on its first run, and later found the report calling a live judge
+  offline.
+- **Selectivity beat volume.** Judging every response scored lower catch with
+  double the false positives and 27x the cost.
+- **The expensive thing is human review, not verification.** Verification is
+  Rs 5,391 a year at the brief's volume; one use case's review queue is
+  Rs 3.36 crore. That reframes what the product is for.
+- **Documents go stale silently.** Six of them quoted a benchmark run that no
+  longer existed. `tests/test_docs_match_report.py` exists because of that.

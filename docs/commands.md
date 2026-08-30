@@ -188,7 +188,7 @@ verdict and every human override is in it.
 
 Recorded: https://drive.google.com/file/d/1S4paAjOKEdX4FT1KDydjQjpdF2UseLI1/view?usp=sharing
 
-If it needs re-recording, the order in `docs/pitch_video.md`, with costs:
+If it needs re-recording, this is the order and what each step costs:
 
     python3 demo/run_pipeline.py --models        # free
     # gateway + feed_dashboard.py --uncertain    # ~30 paise

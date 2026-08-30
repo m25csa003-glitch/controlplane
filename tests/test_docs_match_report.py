@@ -29,10 +29,12 @@ def by_case_type():
     return rows
 
 
+# Every prose document that quotes the benchmark. Checked as it exists rather
+# than as a fixed list - a document that is removed should not break the guard,
+# and one that is added should be covered without editing this.
 def docs():
-    return {f: (ROOT / f).read_text() for f in
-            ("docs/proposal.md", "docs/tasks.md", "README.md", "CLAUDE.md",
-             "docs/assumptions.md", "docs/pitch_video.md")}
+    files = [ROOT / "README.md"] + sorted((ROOT / "docs").glob("*.md"))
+    return {str(f.relative_to(ROOT)): f.read_text() for f in files if f.exists()}
 
 
 def test_the_report_still_has_the_table():
