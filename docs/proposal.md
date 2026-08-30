@@ -195,13 +195,14 @@ exactly that — the number the business itself budgeted for — one use case se
 **Rs 5,391** of compute for the whole estate. Nearly four thousand times.
 
 On our eval set it runs above that cap. Measured with inverse-propensity
-weighting over the reviewed queue, `decision_support` escalates **31.7–32.3%**
-across runs — the range is the judge's non-determinism, not noise in the
-measurement. Held at that rate, the same use case sends about 165,000 responses
-a year to a reviewer: **a little over Rs 3.3 crore**.
+weighting over the reviewed queue, `decision_support` escalates **32.3%** — and
+31.7% on a later run, the difference being the judge's non-determinism rather
+than noise in the measurement. At 32.3% the same use case sends **168,000
+responses a year** to a reviewer: **Rs 3.36 crore** in labour, against Rs 5,391
+of compute for the whole estate.
 
 Both figures are real and they answer different questions. Rs 2.08 crore is what
-this policy budgeted for. Rs 3.3 crore is what it would actually spend if it
+this policy budgeted for. Rs 3.36 crore is what it would actually spend if it
 kept escalating the way it does on our set — which is why the loop reports the
 overage instead of quietly moving the threshold.
 
