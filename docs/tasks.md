@@ -39,8 +39,11 @@ Round 2 implementation was carried out by Akshat Jain.
   p95 against a 300ms budget, and an escalation rate far above its 5% cap. The
   dashboard shows both in red. The cap is the more interesting of the two: it
   says this policy is written for cleaner traffic than it is being given.
-- **`decision_support` escalates 32.3% against its declared 20% cap.** Surfaced
-  by the feedback loop. Needs either reviewers or accepted risk.
+- **`decision_support` escalates about 32% against its declared 20% cap** on
+  the eval set. Surfaced by the feedback loop. Needs either reviewers or
+  accepted risk. The figure moves a little between runs because the judge is
+  not deterministic, and the set is far more hostile than production, so it is
+  not a forecast.
 - **Anthropic modelled cost is an estimate.** No Anthropic key was available to
   measure thinking-token output against. Labelled as estimated everywhere.
 - **HHEM does not load** under transformers 5.x. It stays first in the

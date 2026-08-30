@@ -42,7 +42,7 @@ it was not confident enough.
 | Tier | What | Cost | Latency |
 |---|---|---|---|
 | 0 | Deterministic rules: PII, ACL, schema | free | <1 ms |
-| 1 | NLI grounding, toxicity, bias heuristic | GPU seconds | ~85 ms |
+| 1 | NLI grounding, toxicity, bias heuristic | GPU seconds | 87–190 ms p95 |
 | 2 | LLM judge, only inside the uncertainty band | tokens | 1.3–3.1 s |
 
 The **action router** then weighs `P(wrong) × cost_of_being_wrong` against

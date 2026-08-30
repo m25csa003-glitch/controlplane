@@ -86,5 +86,7 @@ Written down because each of these cost real time and would be repeated.
   double the false positives and 27x the cost — a judge asked to re-rule on
   claims tier 1 already had right sometimes overrules them .
 - **The expensive thing is human review, not verification.** Verification is
-  Rs 5,391 a year at the brief's volume; one use case's review queue is
-  Rs 3.36 crore. That reframes what the product is for.
+  Rs 5,391 a year at the brief's volume; one use case reviewing at the 20% it
+  declared costs Rs 2.08 crore. That reframes what the product is for. Anchor
+  on the declared cap, not on the eval set's escalation rate - that set is
+  57.7% harmful and its rate is not a forecast.

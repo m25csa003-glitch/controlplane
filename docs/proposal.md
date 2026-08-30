@@ -48,12 +48,17 @@ Each tier runs only when the previous one was not confident enough.
 | Tier | What it does | Cost | Measured latency |
 |---|---|---|---|
 | **0** | Deterministic rules: PII patterns, access control, schema | free | under 1 ms |
-| **1** | NLI entailment against each retrieved source, toxicity classifier, bias heuristic | GPU seconds | ~85 ms |
+| **1** | NLI entailment against each retrieved source, toxicity classifier, bias heuristic | GPU seconds | 87–190 ms p95, by policy |
 | **2** | LLM judge, only for claims inside the policy's uncertainty band | tokens | 1.3–3.1 s |
 
 Tier 2 fires on **2.8%** of responses. That number is not a target we set; it
 is what the band produces, and the eval sweeps the band to show what other
 settings would cost.
+
+Tier 1 costs more where the policy asks for more: customer support runs
+per-chunk entailment at 87 ms p95, decision support adds the joined premise and
+pays 190 ms for it. That switch is in the YAML, and section 3 shows what it
+buys.
 
 ### The action router
 
@@ -115,18 +120,21 @@ confidently wrong one:
   cost minimisation says review nearly everything. True, and useless. The sweep
   is constrained by the policy's declared review capacity.
 
-With all three in place the loop found a real problem: `decision_support`
-escalates 32.3% of its traffic against its own declared 20% cap. It reports
-that and stops, because the fix is either more reviewers or more accepted risk,
-and neither is a threshold a tuning script should move on its own.
+With all three in place the loop found a real problem: on this set
+`decision_support` escalates around 32% of its traffic against its own declared
+20% cap. It reports that and stops, because the fix is either more reviewers or
+more accepted risk, and neither is a threshold a tuning script should move on
+its own.
 
 ## 3. Results
 
-319 labelled cases, live judge, zero fallbacks.
+319 labelled cases against a live judge (`openai/gpt-5.6-sol`). One call
+in 328 failed and fell back to the offline judge — 0.3%, counted and named in
+the report rather than left to be discovered.
 
 | Configuration | Catch rate | False positives | Tier 2 rate | p95 latency | Cost |
 |---|---|---|---|---|---|
-| Rules only | 22.8% | 0.0% | 0% | 0.01 ms | Rs 0 |
+| Rules only | 22.8% | 0.0% | 0% | 0.02 ms | Rs 0 |
 | Rules + classifiers | 93.5% | 7.4% | 0% | 140 ms | Rs 0.35 |
 | **The cascade** | **94.6%** | **7.4%** | **2.8%** | **175 ms** | **Rs 1.10** |
 | A judge on every response | 92.4% | 14.8% | 100% | 5534 ms | Rs 30.01 |
@@ -179,10 +187,19 @@ At the brief's reference volume of roughly 30,000 interactions a week —
 
 ### The number that actually matters
 
-Verification is not the expensive part. **Human review is.** At the escalation
-rate `decision_support` currently runs, that one use case alone sends about
-168,000 responses a year to a reviewer — roughly **Rs 3.36 crore** in review
-labour, against Rs 5,391 of compute.
+Verification is not the expensive part. **Human review is.**
+
+`decision_support` declares that it can review 20% of its traffic. Held to
+exactly that — the number the business itself budgeted for — one use case sends
+**104,000 responses a year** to a reviewer: **Rs 2.08 crore** in labour, against
+**Rs 5,391** of compute for the whole estate. Nearly four thousand times.
+
+On our eval set it runs above that cap, at roughly 32%. We do not extrapolate
+that figure: the set is 57.7% harmful by construction, far more hostile than
+production traffic, so its escalation rate is not a forecast. The declared cap
+is the honest planning number, and the argument does not depend on which you
+pick — review labour dominates verification at any rate above a fraction of a
+percent.
 
 This reframes what the product is for. ControlPlane is not primarily a way to
 buy cheap verification; it is a way to **control how much human review you have
