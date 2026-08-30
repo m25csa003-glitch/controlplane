@@ -217,5 +217,3 @@ something that still works, and reports which mode it ended up in.
 
 Nexus — Akshat Jain, Aditya Pratap Singh, Arnesh Sanjeev Singh.
 Round 2 implementation by Akshat Jain.
-
-MIT licensed.
